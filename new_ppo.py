@@ -9,7 +9,7 @@ import optax
 from typing import NamedTuple, Any, Literal
 import distrax
 import pgx.bridge_bidding as bb
-from utils import (
+from src.utils import (
     auto_reset,
     single_play_step_vs_policy_in_bridge_bidding,
     single_play_step_vs_DeepMind_sl_model,
@@ -30,9 +30,9 @@ from omegaconf import OmegaConf
 from pydantic import BaseModel
 import wandb
 
-from duplicate import duplicate_step
-from models import ActorCritic, make_forward_pass
-from evaluation import make_evaluate, make_evaluate_log
+from src.duplicate import duplicate_step
+from src.models import ActorCritic, make_forward_pass
+from src.evaluation import make_evaluate, make_evaluate_log
 
 print(jax.default_backend())
 print(jax.local_devices())

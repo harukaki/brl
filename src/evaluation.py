@@ -11,8 +11,8 @@ import pgx.bridge_bidding as bb
 
 import pickle
 import wandb
-from duplicate import duplicate_step, Table_info
-from models import make_forward_pass
+from src.duplicate import duplicate_step, Table_info
+from src.models import make_forward_pass
 from pprint import pprint
 
 
