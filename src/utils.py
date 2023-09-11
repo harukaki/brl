@@ -4,6 +4,7 @@ import pgx
 import time
 import distrax
 from typing import Tuple
+import numpy as np
 
 TRUE = jnp.bool_(True)
 FALSE = jnp.bool_(False)
@@ -172,9 +173,7 @@ def single_play_step_vs_policy_in_backgammon(step_fn, network, params):
 
     def act_based_on_policy(state, rng):
         logits, value = network.apply(params, state.observation)
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=rng)
         return action
@@ -227,9 +226,7 @@ def single_play_step_vs_policy_in_two(step_fn, network, params):
 
     def act_based_on_policy(state, rng):
         logits, value = network.apply(params, state.observation)
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=rng)
         return action
@@ -249,9 +246,7 @@ def single_play_step_vs_policy_in_two(step_fn, network, params):
     return wrapped_step_fn
 
 
-def single_play_step_vs_policy_in_sparrow_mahjong(
-    step_fn, forward_pass, model
-):
+def single_play_step_vs_policy_in_sparrow_mahjong(step_fn, forward_pass, model):
     """
     assume sparrow mahjong
     """
@@ -265,9 +260,7 @@ def single_play_step_vs_policy_in_sparrow_mahjong(
         (logits, _), _ = forward_pass.apply(
             model_params, model_state, state.observation.astype(jnp.float32)
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by right
@@ -278,9 +271,7 @@ def single_play_step_vs_policy_in_sparrow_mahjong(
         (logits, _), _ = forward_pass.apply(
             model_params, model_state, state.observation.astype(jnp.float32)
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -307,9 +298,7 @@ def single_play_step_vs_policy_in_bridge_bidding(step_fn, forward_pass, model):
         (logits, _), _ = forward_pass.apply(
             model_params, model_state, state.observation.astype(jnp.float32)
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -320,9 +309,7 @@ def single_play_step_vs_policy_in_bridge_bidding(step_fn, forward_pass, model):
         (logits, _), _ = forward_pass.apply(
             model_params, model_state, state.observation.astype(jnp.float32)
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by pd
@@ -335,9 +322,7 @@ def single_play_step_vs_policy_in_bridge_bidding(step_fn, forward_pass, model):
         (logits, _), _ = forward_pass.apply(
             model_params, model_state, state.observation.astype(jnp.float32)
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by right
@@ -372,9 +357,7 @@ def single_play_step_two_policy_commpetitive(
             opp_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -391,9 +374,7 @@ def single_play_step_two_policy_commpetitive(
             actor_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by pd
@@ -410,9 +391,7 @@ def single_play_step_two_policy_commpetitive(
             opp_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -450,9 +429,7 @@ def single_play_step_two_policy_commpetitive_deterministic(
             opp_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.mode()
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -469,9 +446,7 @@ def single_play_step_two_policy_commpetitive_deterministic(
             actor_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.mode()
         state = jax.vmap(step_fn)(state, action)  # step by pd
@@ -488,9 +463,7 @@ def single_play_step_two_policy_commpetitive_deterministic(
             opp_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.mode()
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -498,6 +471,50 @@ def single_play_step_two_policy_commpetitive_deterministic(
         terminated4 = state.terminated
         # print(f"sl model, action: {action}")
         # print(f"rewards: {state.rewards}")
+
+        rewards = rewards1 + rewards2 + rewards3 + rewards4
+        terminated = terminated1 | terminated2 | terminated3 | terminated4
+        return state.replace(rewards=rewards, terminated=terminated)
+
+    return wrapped_step_fn
+
+
+def single_play_step_free_run(
+    step_fn, actor_forward_pass, actor_params, opp_forward_pass, opp_params
+):
+    """
+    assume bridge bidding
+    """
+
+    def wrapped_step_fn(state, action, rng):
+        state = jax.vmap(step_fn)(state, action)
+        rewards1 = state.rewards
+        terminated1 = state.terminated
+
+        # opposite turn
+        action = jnp.zeros_like(action)
+        state = jax.vmap(step_fn)(state, action)  # step by left
+        rewards2 = state.rewards
+        terminated2 = state.terminated
+
+        # actor teammate turn
+        rng, _rng = jax.random.split(rng)
+        logits, _ = actor_forward_pass.apply(
+            actor_params,
+            state.observation.astype(jnp.float32),
+        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
+        pi = distrax.Categorical(logits=logits)
+        action = pi.mode()
+        state = jax.vmap(step_fn)(state, action)  # step by pd
+        rewards3 = state.rewards
+        terminated3 = state.terminated
+
+        # opposite turn
+        action = jnp.zeros_like(action)
+        state = jax.vmap(step_fn)(state, action)  # step by left
+        rewards4 = state.rewards
+        terminated4 = state.terminated
 
         rewards = rewards1 + rewards2 + rewards3 + rewards4
         terminated = terminated1 | terminated2 | terminated3 | terminated4
@@ -529,9 +546,7 @@ def single_play_step_vs_DeepMind_sl_model(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -548,9 +563,7 @@ def single_play_step_vs_DeepMind_sl_model(
             actor_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         state = jax.vmap(step_fn)(state, action)  # step by pd
@@ -564,9 +577,7 @@ def single_play_step_vs_DeepMind_sl_model(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -605,9 +616,7 @@ def single_play_step_vs_DeepMind_sl_model_in_deterministic(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -624,9 +633,7 @@ def single_play_step_vs_DeepMind_sl_model_in_deterministic(
             actor_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.mode()
         state = jax.vmap(step_fn)(state, action)  # step by pd
@@ -640,9 +647,7 @@ def single_play_step_vs_DeepMind_sl_model_in_deterministic(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         state = jax.vmap(step_fn)(state, action)  # step by left
@@ -668,9 +673,7 @@ def duplicate_play_step_vs_DeepMind_sl_model(
     assume bridge bidding
     """
 
-    def wrapped_step_fn(
-        state, action, table_a_reward, has_duplicate_result, rng
-    ):
+    def wrapped_step_fn(state, action, table_a_reward, has_duplicate_result, rng):
         (
             state,
             table_a_reward,
@@ -690,9 +693,7 @@ def duplicate_play_step_vs_DeepMind_sl_model(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         (
@@ -718,9 +719,7 @@ def duplicate_play_step_vs_DeepMind_sl_model(
             actor_params,
             state.observation.astype(jnp.float32),
         )
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = distrax.Categorical(logits=logits)
         action = pi.sample(seed=_rng)
         (
@@ -743,9 +742,7 @@ def duplicate_play_step_vs_DeepMind_sl_model(
         # print(f"current player: {state.current_player}")
         rng, _rng = jax.random.split(rng)
         logits = sl_forward_pass_apply(state.observation.astype(jnp.float32))
-        logits = logits + jnp.finfo(jnp.float64).min * (
-            ~state.legal_action_mask
-        )
+        logits = logits + jnp.finfo(jnp.float64).min * (~state.legal_action_mask)
         pi = jnp.exp(logits)
         action = jnp.argmax(pi, axis=1)
         (
@@ -800,3 +797,15 @@ def visualize(network, params, env_name, rng_key, num_envs):
     print(f"avarage cumulative return over{num_envs}", cum_return.mean())
     if env.id == "2048":
         pgx.save_svg_animation(states, fname, frame_duration_seconds=0.5)
+
+
+def entropy_from_dif(logits, mask):
+    logits = logits + jnp.finfo(np.float64).min * (~mask)
+    log_probs = jax.nn.log_softmax(logits)
+    probs = jax.nn.softmax(logits)
+    entropy = jnp.array(0, dtype=jnp.float32)
+    for i in range(38):
+        entropy = jax.lax.cond(
+            mask[i], lambda: entropy + log_probs[i] * probs[i], lambda: entropy
+        )
+    return -entropy

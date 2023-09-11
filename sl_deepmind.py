@@ -33,7 +33,7 @@ import optax
 
 import pyspiel
 import wandb
-from models import ActorCritic
+from src.models import ActorCritic
 import distrax
 
 OptState = Any
@@ -50,18 +50,14 @@ TOP_K_ACTIONS = 5  # How many alternative actions to display
 flags.DEFINE_integer("iterations", 400000, "Number of iterations")
 flags.DEFINE_string("data_path", "openspiel-data", "Location for data")
 flags.DEFINE_integer("eval_every", 10000, "How often to evaluate the policy")
-flags.DEFINE_integer(
-    "num_examples", 3, "How many examples to print per evaluation"
-)
+flags.DEFINE_integer("num_examples", 3, "How many examples to print per evaluation")
 flags.DEFINE_integer("train_batch", 128, "Batch size for training step")
 flags.DEFINE_integer("eval_batch", 10000, "Batch size when evaluating")
 flags.DEFINE_integer("rng_seed", 42, "Seed for initial network weights")
 flags.DEFINE_string("save_path", None, "Location for saved networks")
 flags.DEFINE_float("learning_rate", 1e-4, "Learning rate for optimizer")
-flags.DEFINE_float("entropy_coef", 0.001, "coef for entropy term")
-flags.DEFINE_string(
-    "model_type", "DeepMind", "model type of NN, DeepMind or FAIR"
-)
+flags.DEFINE_float("entropy_coef", 0.1, "coef for entropy term")
+flags.DEFINE_string("model_type", "DeepMind", "model type of NN, DeepMind or FAIR")
 
 
 def _no_play_trajectory(line: str):
@@ -87,7 +83,8 @@ def make_dataset(file: str):
             state = GAME.new_initial_state()
             for action in trajectory[:action_index]:
                 state.apply_action(action)
-            """ print("state")
+            """
+            print("state")
             print(state)
             print("observe")
             print(state.observation_tensor())
@@ -97,10 +94,15 @@ def make_dataset(file: str):
             print("trajectory action_index")
             print(trajectory[action_index])
             print("target")
-            print(trajectory[action_index] - MIN_ACTION) """
+            print(trajectory[action_index] - MIN_ACTION)
+            """
+            legal_actions = state.legal_actions()
+            legal_actions_tensor = np.zeros(38)
+            legal_actions_tensor[np.array(legal_actions) - 52] = 1
             yield (
                 state.observation_tensor()[4:484],
                 trajectory[action_index] - MIN_ACTION,
+                legal_actions_tensor,
             )
 
 
@@ -109,10 +111,15 @@ def batch(dataset, batch_size: int):
     # observations = np.zeros([batch_size] + GAME.observation_tensor_shape(), np.float32)
     observations = np.zeros([batch_size] + [480], np.float32)
     labels = np.zeros(batch_size, dtype=np.int32)
+    legal_actions = np.zeros([batch_size] + [38], dtype=np.bool8)
     while True:
         for batch_index in range(batch_size):
-            observations[batch_index], labels[batch_index] = next(dataset)
-        yield observations, labels
+            (
+                observations[batch_index],
+                labels[batch_index],
+                legal_actions[batch_index],
+            ) = next(dataset)
+        yield observations, labels, legal_actions
 
 
 def one_hot(x, k):
@@ -171,6 +178,7 @@ def main(argv):
         params: Params,
         inputs: np.ndarray,
         targets: np.ndarray,
+        legal_actions: np.ndarray,
     ):
         """Cross-entropy loss."""
         assert targets.dtype == np.int32
@@ -178,8 +186,11 @@ def main(argv):
         logits = net.apply(params, inputs)
         log_probs = jax.nn.log_softmax(logits)
         target_loss = -jnp.mean(one_hot(targets, NUM_ACTIONS) * log_probs)
-        pi = distrax.Categorical(logits)
-        entropy = pi.entropy().mean()
+        masked_logits = logits + jnp.finfo(np.float64).min * (~legal_actions)
+        masked_pi = distrax.Categorical(masked_logits)
+        entropy = masked_pi.entropy().mean()
+        # pi = distrax.Categorical(logits)
+        # entropy = pi.entropy().mean()
         total_loss = target_loss - FLAGS.entropy_coef * entropy
         return total_loss, (target_loss, entropy)
 
@@ -200,10 +211,11 @@ def main(argv):
         opt_state: OptState,
         inputs: np.ndarray,
         targets: np.ndarray,
+        legal_actions: np.ndarray,
     ):
         """Learning rule (stochastic gradient descent)."""
         grad_fn = jax.value_and_grad(loss, has_aux=True)
-        Loss, gradient = grad_fn(params, inputs, targets)
+        Loss, gradient = grad_fn(params, inputs, targets, legal_actions)
         updates, opt_state = opt.update(gradient, opt_state)
         new_params = optax.apply_updates(params, updates)
         return new_params, opt_state, Loss
@@ -226,24 +238,14 @@ def main(argv):
                     )
                     # policy = np.exp(net.apply(params, observation))
                     policy = jax.nn.softmax(net.apply(params, observation))
-                    probs_actions = [
-                        (p, a + MIN_ACTION) for a, p in enumerate(policy)
-                    ]
+                    probs_actions = [(p, a + MIN_ACTION) for a, p in enumerate(policy)]
                     pred = max(probs_actions)[1]
                     if pred != action:
                         print(state)
-                        for p, a in reversed(
-                            sorted(probs_actions)[-TOP_K_ACTIONS:]
-                        ):
-                            print(
-                                "{:7} {:.2f}".format(
-                                    state.action_to_string(a), p
-                                )
-                            )
+                        for p, a in reversed(sorted(probs_actions)[-TOP_K_ACTIONS:]):
+                            print("{:7} {:.2f}".format(state.action_to_string(a), p))
                         print(
-                            "Ground truth {}\n".format(
-                                state.action_to_string(action)
-                            )
+                            "Ground truth {}\n".format(state.action_to_string(action))
                         )
                         count += 1
                         break
@@ -269,16 +271,16 @@ def main(argv):
 
     # Initialize network and optimiser.
     rng = jax.random.PRNGKey(FLAGS.rng_seed)  # seed used for network weights
-    inputs, unused_targets = next(train)
+    inputs, unused_targets, unused_legal_actions = next(train)
     params = net.init(rng, inputs)
     opt_state = opt.init(params)
 
     # Train/eval loop.
     for step in range(FLAGS.iterations):
         # Do SGD on a batch of training examples.
-        inputs, targets = next(train)
+        inputs, targets, legal_actions = next(train)
         params, opt_state, train_loss = update(
-            params, opt_state, inputs, targets
+            params, opt_state, inputs, targets, legal_actions
         )
         total_loss, (target_loss, entropy) = train_loss
         train_accuracy = accuracy(params, inputs, targets)
@@ -291,21 +293,24 @@ def main(argv):
 
         # Periodically evaluate classification accuracy on the test set.
         if (1 + step) % FLAGS.eval_every == 0:
-            inputs, targets = next(test)
+            inputs, targets, legal_actions = next(test)
             test_accuracy = accuracy(params, inputs, targets)
-            test_loss = loss(params, inputs, targets)
+            test_loss = loss(params, inputs, targets, legal_actions)
             total_loss, (target_loss, entropy) = test_loss
+            pi = jax.nn.softmax(net.apply(params, inputs))
+            print(pi)
+            print(legal_actions)
+            illegal_action_prob = jax.vmap(jnp.dot)(pi, ~legal_actions)
             print(f"After {1+step} steps, test accuracy: {test_accuracy}.")
             test_metrics = {
                 "test/total_loss": total_loss,
                 "test/target_loss": target_loss,
                 "test/entropy": entropy,
                 "test/test_accuracy": test_accuracy,
+                "test/illegal_actions_prob": illegal_action_prob.mean(),
             }
             if FLAGS.save_path:
-                filename = os.path.join(
-                    FLAGS.save_path, f"params-{1 + step}.pkl"
-                )
+                filename = os.path.join(FLAGS.save_path, f"params-{1 + step}.pkl")
                 with open(filename, "wb") as pkl_file:
                     pickle.dump(params, pkl_file)
             output_samples(params, FLAGS.num_examples)

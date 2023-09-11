@@ -1,18 +1,19 @@
 __pycache__/
+venv/*
+.vscode/*
 
+# log folder for experiments
 wandb/
-venv/
+rl_log/*
+sl_log/*
 
-log/
+# dataset folder for experiments
+dataset/*
+dds_results/*
+
+# outputs from experiments
 svg/
-sl_fair/
-sl_fair_0_1/
-sl_params/
-rl_params/
-bridge_bidding_sl_networks/
-checkpoints/
-vis/
-dds_results/
-dds_results_old/
-dds_hash_table/
-openspiel-data/
+*.out
+
+# shell scripts for experiments
+*.sh

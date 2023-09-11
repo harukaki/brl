@@ -92,9 +92,7 @@ for file in train_dds_results_list:
             logits_old, value = sl_forward_pass.apply(
                 sl_params, pgx_state.observation
             )  # DONE
-            mask_logits = jnp.finfo(np.float32).min * (
-                ~pgx_state.legal_action_mask
-            )
+            mask_logits = jnp.finfo(np.float64).min * (~pgx_state.legal_action_mask)
             logits = logits_old + mask_logits
             pi = distrax.Categorical(logits=logits)
             action = pi.sample(seed=subkey)
@@ -181,8 +179,7 @@ while not pgx_state.terminated.all():
     pgx_state.save_svg(f"test/{i:04d}.svg")
     print(openspiel_state)
     valid = jnp.all(
-        jnp.array(openspiel_state.observation_tensor()[4:484])
-        == pgx_state.observation
+        jnp.array(openspiel_state.observation_tensor()[4:484]) == pgx_state.observation
     )
     print(f"obs valid: {valid}")
     if not valid:

@@ -89,10 +89,8 @@ def duplicate_evaluate(params, rng_key):
         return ~state.terminated.all()
 
     def rl_make_action(state):
-        logits_old, value = rl_forward_pass.apply(
-            params, state.observation
-        )  # DONE
-        mask_logits = jnp.finfo(np.float32).min * (~state.legal_action_mask)
+        logits_old, value = rl_forward_pass.apply(params, state.observation)  # DONE
+        mask_logits = jnp.finfo(np.float64).min * (~state.legal_action_mask)
         logits = logits_old + mask_logits
         pi = distrax.Categorical(logits=logits)
         return (
@@ -125,10 +123,8 @@ def duplicate_evaluate(params, rng_key):
     """
 
     def sl_make_action(state):
-        logits_old, value = rl_forward_pass.apply(
-            sl_params, state.observation
-        )  # DONE
-        mask_logits = jnp.finfo(np.float32).min * (~state.legal_action_mask)
+        logits_old, value = rl_forward_pass.apply(sl_params, state.observation)  # DONE
+        mask_logits = jnp.finfo(np.float64).min * (~state.legal_action_mask)
         logits = logits_old + mask_logits
         pi = distrax.Categorical(logits=logits)
         return (
@@ -149,9 +145,9 @@ def duplicate_evaluate(params, rng_key):
 
     def loop_fn(tup):
         state, table_a_reward, has_duplicate_result, cum_return, rng_key = tup
-        action, probs, logits, mask, logits_old, mask_logits = jax.vmap(
-            make_action
-        )(state)
+        action, probs, logits, mask, logits_old, mask_logits = jax.vmap(make_action)(
+            state
+        )
         """
         print(f"current_player {state.current_player}")
         print(f"actor {jax.vmap(check_actor)(state)}")

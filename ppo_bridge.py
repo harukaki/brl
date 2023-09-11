@@ -520,7 +520,7 @@ def duplicate_evaluate(params, rng_key):
         logits_old, value = rl_forward_pass.apply(
             params, state.observation
         )  # DONE
-        mask_logits = jnp.finfo(np.float32).min * (~state.legal_action_mask)
+        mask_logits = jnp.finfo(np.float64).min * (~state.legal_action_mask)
         logits = logits_old + mask_logits
         pi = distrax.Categorical(logits=logits)
         return (
