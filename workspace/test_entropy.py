@@ -44,11 +44,12 @@ mask = jnp.array([1, 1, 0, 1], dtype=jnp.bool_)
     probs,
     log_probs,
 ) = entropy_from_dif(logits, mask)
-print("calc from difinition")
+print("Calc from difinition")
 print(f"entropy: {entropy}")
 print(f"logits: {logits}")
 print(f"probs: {probs}")
 print(f"log_probs: {log_probs}")
+print("\n")
 
 
 @jax.jit
@@ -61,6 +62,7 @@ grad_fn = jax.value_and_grad(loss_fn)
 value, grad = grad_fn(logits, mask)
 print(f"entropy: {value}")
 print(f"grad: {grad}")
+print("\n")
 
 
 (
@@ -68,7 +70,7 @@ print(f"grad: {grad}")
     logits,
     probs,
 ) = entropy_from_distrax(logits, mask)
-print("calc from distrax")
+print("Calc from distrax")
 print(f"entropy: {entropy}")
 print(f"logits: {logits}")
 print(f"probs: {probs}")
@@ -82,9 +84,10 @@ def loss_fn(logits, mask):
 
 grad_fn = jax.value_and_grad(loss_fn)
 value, grad = grad_fn(logits, mask)
+print("\n")
 print(f"entropy: {value}")
 print(f"grad: {grad}")
-
+print("\n")
 
 # experiments in bridge bidding
 
@@ -132,7 +135,7 @@ mask = state.legal_action_mask
     probs,
     log_probs,
 ) = entropy_from_dif(logits, mask)
-print("calc from difinition")
+print("Calc from difinition")
 print(f"entropy: {entropy}")
 print(f"logits: {logits}")
 print(f"probs: {probs}")
@@ -147,16 +150,17 @@ def loss_fn(logits, mask):
 
 grad_fn = jax.value_and_grad(loss_fn)
 value, grad = grad_fn(logits, mask)
+print("\n")
 print(f"entropy: {value}")
 print(f"grad: {grad}")
-
+print("\n")
 
 (
     entropy,
     logits,
     probs,
 ) = entropy_from_distrax(logits, mask)
-print("calc from distrax")
+print("Calc from distrax")
 print(f"entropy: {entropy}")
 print(f"logits: {logits}")
 print(f"probs: {probs}")
@@ -170,5 +174,6 @@ def loss_fn(logits, mask):
 
 grad_fn = jax.value_and_grad(loss_fn)
 value, grad = grad_fn(logits, mask)
+print("\n")
 print(f"entropy: {value}")
 print(f"grad: {grad}")
