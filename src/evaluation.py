@@ -25,7 +25,7 @@ def make_act(act_type):
             logits_old, value = forward_pass.apply(
                 params, state.observation
             )  # DONE
-            mask_logits = jnp.finfo(np.float32).min * (
+            mask_logits = jnp.finfo(np.float64).min * (
                 ~state.legal_action_mask
             )
             logits = logits_old + mask_logits
@@ -70,6 +70,30 @@ def make_evaluate(config, duplicate=False):
     opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
     num_eval_envs = config["NUM_EVAL_ENVS"]
 
+    if config["GAME_MODE"] == "competitive":
+        opp_forward_pass = make_forward_pass(
+            activation=config["OPP_ACTIVATION"],
+            model_type=config["OPP_MODEL_TYPE"],
+        )
+        opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
+
+        def opp_make_action(state):
+            logits, value = opp_forward_pass.apply(
+                opp_params, state.observation
+            )  # DONE
+            masked_logits = logits + jnp.finfo(np.float64).min * (
+                ~state.legal_action_mask
+            )
+            masked_pi = distrax.Categorical(logits=masked_logits)
+            pi = distrax.Categorical(logits=logits)
+            return (masked_pi.mode(), pi.probs)
+
+    elif config["GAME_MODE"] == "free-run":
+
+        def opp_make_action(state):
+            pi_probs = jnp.zeros(38).at[0].set(True)
+            return (jnp.int32(0), pi_probs)
+
     def get_fn(x, i):
         return x[i]
 
@@ -99,9 +123,7 @@ def make_evaluate(config, duplicate=False):
             logits_old, value = actor_forward_pass.apply(
                 actor_params, state.observation
             )  # DONE
-            mask_logits = jnp.finfo(np.float32).min * (
-                ~state.legal_action_mask
-            )
+            mask_logits = jnp.finfo(np.float64).min * (~state.legal_action_mask)
             logits = logits_old + mask_logits
             pi = distrax.Categorical(logits=logits)
             return (
@@ -128,9 +150,7 @@ def make_evaluate(config, duplicate=False):
             logits_old, value = opp_forward_pass.apply(
                 opp_params, state.observation
             )  # DONE
-            mask_logits = jnp.finfo(np.float32).min * (
-                ~state.legal_action_mask
-            )
+            mask_logits = jnp.finfo(np.float64).min * (~state.legal_action_mask)
             logits = logits_old + mask_logits
             pi = distrax.Categorical(logits=logits)
             return (
@@ -149,9 +169,7 @@ def make_evaluate(config, duplicate=False):
                 lambda: sl_make_action(state),
             )
 
-        def update_log_info(
-            logits_old, mask, current_player, action, log_info
-        ):
+        def update_log_info(logits_old, mask, current_player, action, log_info):
             (
                 actor_total_illegal_action_probs,
                 opp_total_illegal_action_probs,
@@ -201,9 +219,7 @@ def make_evaluate(config, duplicate=False):
                 opp_bid,
             )
 
-        def make_step_log(
-            state, logits_old, mask, current_player, action, log_info
-        ):
+        def make_step_log(state, logits_old, mask, current_player, action, log_info):
             return jax.lax.cond(
                 state.terminated,
                 lambda: log_info,
@@ -526,50 +542,35 @@ def make_evaluate(config, duplicate=False):
         opp_step_count = jnp.zeros(num_eval_envs)
         actor_bid = jnp.zeros((num_eval_envs, 35))
         opp_bid = jnp.zeros((num_eval_envs, 35))
+        count = 0
 
         def cond_fn(tup):
-            (
-                state,
-                _,
-                _,
-                _,
-                _,
-                _,
-            ) = tup
+            (state, _, _, _, _, _, _) = tup
             return ~state.terminated.all()
 
         def actor_make_action(state):
             logits, value = actor_forward_pass.apply(
                 actor_params, state.observation
             )  # DONE
-            masked_logits = logits + jnp.finfo(np.float32).min * (
+            masked_logits = logits + jnp.finfo(np.float64).min * (
                 ~state.legal_action_mask
             )
             masked_pi = distrax.Categorical(logits=masked_logits)
             pi = distrax.Categorical(logits=logits)
-            return (masked_pi.mode(), masked_pi.probs, logits, pi.probs)
+            return (masked_pi.mode(), pi.probs)
 
+        """
         def opp_make_action(state):
-            logits, value = actor_forward_pass.apply(
-                actor_params, state.observation
+            logits, value = opp_forward_pass.apply(
+                opp_params, state.observation
             )  # DONE
-            masked_logits = logits + jnp.finfo(np.float32).min * (
+            masked_logits = logits + jnp.finfo(np.float64).min * (
                 ~state.legal_action_mask
             )
             masked_pi = distrax.Categorical(logits=masked_logits)
             pi = distrax.Categorical(logits=logits)
-            return (masked_pi.mode(), masked_pi.probs, logits, pi.probs)
-
-        def pass_act(state):
-            pi_probs = jnp.zeros(38).at[0].set(True)
-            return (
-                jnp.int32(0),
-                pi_probs,
-                jnp.zeros(38, dtype=jnp.float32),
-                state.legal_action_mask,
-                jnp.zeros(38, dtype=jnp.float32),
-                jnp.zeros(38, dtype=jnp.float32),
-            )
+            return (masked_pi.mode(), pi.probs)
+        """
 
         def make_action(state):
             return jax.lax.cond(
@@ -648,10 +649,9 @@ def make_evaluate(config, duplicate=False):
                 cum_return,
                 log_info,
                 rng_key,
+                count,
             ) = tup
-            (action, masked_pi_probs, logits, pi_probs) = jax.vmap(
-                make_action
-            )(state)
+            (action, pi_probs) = jax.vmap(make_action)(state)
 
             (
                 actor_total_illegal_action_probs,
@@ -661,12 +661,16 @@ def make_evaluate(config, duplicate=False):
                 actor_bid,
                 opp_bid,
             ) = jax.vmap(make_step_log)(state, pi_probs, action, log_info)
+
+            """
             print(f"terminated: {state.terminated}")
             print(f"current player: {state.current_player}")
             # print(f"masked action prob: {masked_pi_probs}")
             print(f"action prob: {pi_probs}")
             print(f"illegal action: {~state.legal_action_mask}")
-            print(f"illegal action probs: {jax.vmap(jnp.dot)(pi_probs, ~state.legal_action_mask)}")
+            print(
+                f"illegal action probs: {jax.vmap(jnp.dot)(pi_probs, ~state.legal_action_mask)}"
+            )
             print(f"action: {action}")
             print(f"act illegal action: {actor_total_illegal_action_probs}")
             print(f"opp illegal action: {opp_total_illegal_action_probs}")
@@ -676,6 +680,7 @@ def make_evaluate(config, duplicate=False):
             print(f"opp bid: {opp_bid}")
             print(state._bidding_history)
             # state.save_svg("svg/test.svg")
+            """
             rng_key, _rng = jax.random.split(rng_key)
             (state, table_a_info, table_b_info) = jax.vmap(step_fn)(
                 state, action, table_a_info, table_b_info
@@ -683,6 +688,8 @@ def make_evaluate(config, duplicate=False):
             cum_return = cum_return + jax.vmap(get_fn)(
                 state.rewards, jnp.zeros_like(state.current_player)
             )
+            count += 1
+            # state.save_svg(f"svg/{count}.svg")
             return (
                 state,
                 table_a_info,
@@ -697,6 +704,7 @@ def make_evaluate(config, duplicate=False):
                     opp_bid,
                 ),
                 rng_key,
+                count,
             )
 
         """
@@ -714,13 +722,14 @@ def make_evaluate(config, duplicate=False):
 
         """
 
+        """
         def while_loop(cond_fun, body_fun, init_val):
             val = init_val
             while cond_fun(val):
                 val = body_fun(val)
                 # print(val[0]
             return val
-
+        """
         (
             state,
             table_a_info,
@@ -735,7 +744,8 @@ def make_evaluate(config, duplicate=False):
                 opp_bid,
             ),
             _,
-        ) = while_loop(
+            count,
+        ) = jax.lax.while_loop(
             cond_fn,
             loop_fn,
             (
@@ -752,11 +762,257 @@ def make_evaluate(config, duplicate=False):
                     opp_bid,
                 ),
                 rng_key,
+                count,
             ),
         )
         # state.save_svg("svg/duplicate.svg")
 
-        return cum_return, table_a_info, table_b_info
+        def make_terminated_log(table_info):
+            return jax.lax.cond(
+                (table_info.last_bidder == -1) & (table_info.last_bid == -1),
+                lambda: (
+                    jnp.bool_(True),
+                    (
+                        jnp.zeros(35),
+                        jnp.zeros(35),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                    ),
+                ),
+                lambda: (
+                    jnp.bool_(False),
+                    make_contract_log(table_info),
+                ),
+            )
+
+        def make_contract_log(table_info):
+            actor_contract = jnp.zeros(35)
+            opp_contract = jnp.zeros(35)
+            actor_contract, opp_contract = jax.lax.cond(
+                table_info.last_bidder < 2,
+                lambda: (
+                    actor_contract.at[table_info.last_bid].set(1),
+                    opp_contract,
+                ),
+                lambda: (
+                    actor_contract,
+                    opp_contract.at[table_info.last_bid].set(1),
+                ),
+            )
+            actor_doubled_contract, actor_redoubled_contract = jax.lax.cond(
+                table_info.last_bidder < 2,
+                lambda: (table_info.call_x, table_info.call_xx),
+                lambda: (jnp.bool_(False), jnp.bool_(False)),
+            )
+            opp_doubled_contract, opp_redoubled_contract = jax.lax.cond(
+                table_info.last_bidder >= 2,
+                lambda: (table_info.call_x, table_info.call_xx),
+                lambda: (jnp.bool_(False), jnp.bool_(False)),
+            )
+            (
+                actor_make_contract,
+                opp_make_contract,
+                actor_down_contract,
+                opp_down_contract,
+            ) = jax.lax.cond(
+                table_info.rewards[0] >= 0,
+                lambda: jax.lax.cond(
+                    table_info.last_bidder < 2,
+                    lambda: (
+                        jnp.bool_(True),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                    ),
+                    lambda: (
+                        jnp.bool_(False),
+                        jnp.bool_(True),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                    ),
+                ),
+                lambda: jax.lax.cond(
+                    table_info.last_bidder < 2,
+                    lambda: (
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(True),
+                        jnp.bool_(False),
+                    ),
+                    lambda: (
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(False),
+                        jnp.bool_(True),
+                    ),
+                ),
+            )
+            return (
+                actor_contract,
+                opp_contract,
+                actor_doubled_contract,
+                actor_redoubled_contract,
+                opp_doubled_contract,
+                opp_redoubled_contract,
+                actor_make_contract,
+                opp_make_contract,
+                actor_down_contract,
+                opp_down_contract,
+            )
+
+        actor_illegal_action_probs = jax.vmap(lambda x, y: x / y)(
+            actor_total_illegal_action_probs, actor_step_count
+        )
+        opp_illegal_action_probs = jax.vmap(lambda x, y: x / y)(
+            opp_total_illegal_action_probs, opp_step_count
+        )
+        """
+        print(state)
+        state.save_svg("svg/test_eval.svg")
+        print(f"cum_return: {cum_return}")
+        print(f"actor_total_illegal_action_probs: {actor_total_illegal_action_probs}")
+        print(f"opp_total_illegal_action_probs: {opp_total_illegal_action_probs}")
+        print(f"actor_illegal_action_probs: {actor_illegal_action_probs}")
+        print(f"opp_illegal_action_probs: {opp_illegal_action_probs}")
+        print(f"actor_bid: {actor_bid}")
+        print(f"actor_bid.mean: {actor_bid.mean(axis=0)}")
+        print(f"opp_bid: {opp_bid}")
+        print(f"opp_bid.mean: {opp_bid.mean(axis=0)}")
+        """
+        table_a_pass_out, (
+            table_a_actor_contract,
+            table_a_opp_contract,
+            table_a_actor_doubled_contract,
+            table_a_actor_redoubled_contract,
+            table_a_opp_doubled_contract,
+            table_a_opp_redoubled_contract,
+            table_a_actor_make_contract,
+            table_a_opp_make_contract,
+            table_a_actor_down_contract,
+            table_a_opp_down_contract,
+        ) = jax.vmap(make_terminated_log)(table_a_info)
+        table_a_pass_out_ratio = table_a_pass_out.sum() / num_eval_envs
+        table_a_actor_doubled_count = table_a_actor_doubled_contract.sum()
+        table_a_actor_redoubled_count = table_a_actor_redoubled_contract.sum()
+        table_a_opp_doubled_count = table_a_opp_doubled_contract.sum()
+        table_a_opp_redoubled_count = table_a_opp_redoubled_contract.sum()
+        table_a_actor_declarer_count = table_a_actor_contract.sum()
+        table_a_actor_declarer_ratio = table_a_actor_declarer_count / num_eval_envs
+        table_a_opp_declarer_count = table_a_opp_contract.sum()
+        table_a_opp_declarer_ratio = table_a_opp_declarer_count / num_eval_envs
+        table_a_score_reward = jax.vmap(get_fn)(
+            table_a_info.rewards, jnp.zeros_like(state.current_player)
+        )
+        """
+        print(table_a_info)
+        print(f"table_a_actor_contract: {table_a_actor_contract}")
+        print(f"table_a_actor_contract.mean: {table_a_actor_contract.mean(axis=0)}")
+        print(f"table_a_opp_contract: {table_a_opp_contract}")
+        print(f"table_a_opp_contract.mean: {table_a_opp_contract.mean(axis=0)}")
+        print(f"table_a_actor_declarer_count: {table_a_actor_declarer_count}")
+        print(f"table_a_opp_declarer_count: {table_a_opp_declarer_count}")
+        print(f"table_a_actor_doubled_count: {table_a_actor_doubled_count}")
+        print(f"table_a_actor_redoubled_count: {table_a_actor_redoubled_count}")
+        print(f"table_a_opp_doubled_count: {table_a_opp_doubled_count}")
+        print(f"opp_redoubled_count: {table_a_opp_redoubled_count}")
+        print(
+            f"table_a_actor_make_contract_ratio: {table_a_actor_make_contract.mean()}"
+        )
+        print(f"table_a_opp_make_contract_ratio: {table_a_opp_make_contract.mean()}")
+        print(
+            f"table_a_actor_down_contract_ratio: {table_a_actor_down_contract.mean()}"
+        )
+        print(f"table_a_opp_down_contract_ratio: {table_a_opp_down_contract.mean()}")
+        """
+        table_b_pass_out, (
+            table_b_actor_contract,
+            table_b_opp_contract,
+            table_b_actor_doubled_contract,
+            table_b_actor_redoubled_contract,
+            table_b_opp_doubled_contract,
+            table_b_opp_redoubled_contract,
+            table_b_actor_make_contract,
+            table_b_opp_make_contract,
+            table_b_actor_down_contract,
+            table_b_opp_down_contract,
+        ) = jax.vmap(make_terminated_log)(table_b_info)
+        table_b_pass_out_ratio = table_b_pass_out.sum() / num_eval_envs
+        table_b_actor_doubled_count = table_b_actor_doubled_contract.sum()
+        table_b_actor_redoubled_count = table_b_actor_redoubled_contract.sum()
+        table_b_opp_doubled_count = table_b_opp_doubled_contract.sum()
+        table_b_opp_redoubled_count = table_b_opp_redoubled_contract.sum()
+        table_b_actor_declarer_count = table_b_actor_contract.sum()
+        table_b_actor_declarer_ratio = table_b_actor_declarer_count / num_eval_envs
+        table_b_opp_declarer_count = table_b_opp_contract.sum()
+        table_b_opp_declarer_ratio = table_b_opp_declarer_count / num_eval_envs
+        table_b_score_reward = jax.vmap(get_fn)(
+            table_b_info.rewards, jnp.zeros_like(state.current_player)
+        )
+        """
+        print(f"table_b_actor_contract: {table_b_actor_contract}")
+        print(f"table_b_actor_contract.mean: {table_b_actor_contract.mean(axis=0)}")
+        print(f"table_b_opp_contract: {table_b_opp_contract}")
+        print(f"table_b_opp_contract.mean: {table_b_opp_contract.mean(axis=0)}")
+        print(f"table_b_actor_declarer_count: {table_b_actor_declarer_count}")
+        print(f"table_b_opp_declarer_count: {table_b_opp_declarer_count}")
+        print(f"table_b_actor_doubled_count: {table_b_actor_doubled_count}")
+        print(f"table_b_actor_redoubled_count: {table_b_actor_redoubled_count}")
+        print(f"table_b_opp_doubled_count: {table_b_opp_doubled_count}")
+        print(f"opp_redoubled_count: {table_b_opp_redoubled_count}")
+        print(
+            f"table_b_actor_make_contract_ratio: {table_b_actor_make_contract.mean()}"
+        )
+        print(f"table_b_opp_make_contract_ratio: {table_b_opp_make_contract.mean()}")
+        print(
+            f"table_b_actor_down_contract_ratio: {table_b_actor_down_contract.mean()}"
+        )
+        print(f"table_b_opp_down_contract_ratio: {table_b_opp_down_contract.mean()}")
+        """
+        log_info = (
+            cum_return.mean(),
+            (table_a_score_reward.mean() + table_b_score_reward.mean()) / 2,
+            actor_illegal_action_probs.mean(),
+            opp_illegal_action_probs.mean(),
+            state._step_count.mean(),
+            actor_bid.mean(axis=0) / 2,
+            opp_bid.mean(axis=0) / 2,
+            (table_a_actor_contract.mean(axis=0) + table_b_actor_contract.mean(axis=0))
+            / 2,
+            (table_a_opp_contract.mean(axis=0) + table_b_opp_contract.mean(axis=0)) / 2,
+            (table_a_actor_declarer_ratio + table_b_actor_declarer_ratio) / 2,
+            (table_a_opp_declarer_ratio + table_b_opp_declarer_ratio) / 2,
+            (
+                table_a_actor_doubled_contract.mean()
+                + table_b_actor_doubled_contract.mean()
+            )
+            / 2,
+            (
+                table_a_actor_redoubled_contract.mean()
+                + table_b_actor_redoubled_contract.mean()
+            )
+            / 2,
+            (table_a_opp_doubled_contract.mean() + table_b_opp_doubled_contract.mean())
+            / 2,
+            (
+                table_a_opp_redoubled_contract.mean()
+                + table_b_opp_redoubled_contract.mean()
+            )
+            / 2,
+            (table_a_actor_make_contract.mean() + table_b_actor_make_contract.mean())
+            / 2,
+            (table_a_opp_make_contract.mean() + table_b_opp_make_contract.mean()) / 2,
+            (table_a_actor_down_contract.mean() + table_b_actor_down_contract.mean())
+            / 2,
+            (table_a_opp_down_contract.mean() + table_b_opp_down_contract.mean()) / 2,
+            (table_a_pass_out_ratio + table_b_pass_out_ratio) / 2,
+        )
+        return log_info, table_a_info, table_b_info
 
     if duplicate:
         return duplicate_evaluate
@@ -766,7 +1022,8 @@ def make_evaluate(config, duplicate=False):
 
 def make_evaluate_log(log_info):
     (
-        cum_return_mean,
+        IMP_return_mean,
+        score_return_mean,
         actor_illegal_action_probs_mean,
         opp_illegal_action_probs_mean,
         step_count_mean,
@@ -786,71 +1043,49 @@ def make_evaluate_log(log_info):
         opp_down_contract_mean,
         pass_out_ratio,
     ) = log_info
+
     log = {
-        "eval/score_reward": float(cum_return_mean),
-        "eval/actor_illegal_action_probs": float(
-            actor_illegal_action_probs_mean
-        ),
-        "eval/opp_illegal_action_probs": float(opp_illegal_action_probs_mean),
-        "eval/step count": float(step_count_mean),
-        "eval/actor_declarer_ratio": float(actor_declarer_ratio),
-        "eval/opp_declarer_ratio": float(opp_declarer_ratio),
-        "eval/actor_doubled_ratio": float(actor_doubled_ratio),
-        "eval/actor_redoubled_ratio": float(actor_redoubled_ratio),
-        "eval/opp_doubled_ratio": float(opp_doubled_ratio),
-        "eval/opp_redoubled_ratio": float(opp_redoubled_ratio),
-        "eval/actor_make_contract_ratio": float(actor_make_contract_mean),
-        "eval/opp_make_contract_ratio": float(opp_make_contract_mean),
-        "eval/actor_down_contract_ratio": float(actor_down_contract_mean),
-        "eval/opp_down_contract_ratio": float(opp_down_contract_mean),
-        "eval/pass_out_ratio": float(pass_out_ratio),
+        "eval/IMP_reward": IMP_return_mean,
+        "eval/score_reward": score_return_mean,
+        "eval/actor_illegal_action_probs": actor_illegal_action_probs_mean,
+        "eval/opp_illegal_action_probs": opp_illegal_action_probs_mean,
+        "eval/step count": step_count_mean,
+        "eval/actor_declarer_ratio": actor_declarer_ratio,
+        "eval/opp_declarer_ratio": opp_declarer_ratio,
+        "eval/actor_doubled_ratio": actor_doubled_ratio,
+        "eval/actor_redoubled_ratio": actor_redoubled_ratio,
+        "eval/opp_doubled_ratio": opp_doubled_ratio,
+        "eval/opp_redoubled_ratio": opp_redoubled_ratio,
+        "eval/actor_make_contract_ratio": actor_make_contract_mean,
+        "eval/opp_make_contract_ratio": opp_make_contract_mean,
+        "eval/actor_down_contract_ratio": actor_down_contract_mean,
+        "eval/opp_down_contract_ratio": opp_down_contract_mean,
+        "eval/pass_out_ratio": pass_out_ratio,
     }
+
     suits = ["C", "D", "H", "S", "NT"]
     numbers = range(1, 8)
-    actor_bid_probs_keys = [
-        f"eval/actor_bid_probs/{number}{suit}"
-        for number in numbers
-        for suit in suits
-    ]
-    actor_contract_probs_keys = [
-        f"eval/actor_contract_probs/{number}{suit}"
-        for number in numbers
-        for suit in suits
-    ]
-    opp_bid_probs_keys = [
-        f"eval/opp_bid_probs/{number}{suit}"
-        for number in numbers
-        for suit in suits
-    ]
-    opp_contract_probs_keys = [
-        f"eval/opp_contract_probs/{number}{suit}"
-        for number in numbers
-        for suit in suits
-    ]
-    actor_bid_probs_dict = dict(
-        zip(actor_bid_probs_keys, actor_bid_mean.astype(float))
-    )
-    actor_contract_probs_dict = dict(
-        zip(actor_contract_probs_keys, actor_contract_mean.astype(float))
-    )
-    opp_bid_probs_dict = dict(
-        zip(opp_bid_probs_keys, opp_bid_mean.astype(float))
-    )
-    opp_contract_probs_dict = dict(
-        zip(opp_contract_probs_keys, opp_contract_mean.astype(float))
-    )
-    actor_bid_probs_dict = {
-        key: float(value) for key, value in actor_bid_probs_dict.items()
-    }
-    actor_contract_probs_dict = {
-        key: float(value) for key, value in actor_contract_probs_dict.items()
-    }
-    opp_bid_probs_dict = {
-        key: float(value) for key, value in opp_bid_probs_dict.items()
-    }
-    opp_contract_probs_dict = {
-        key: float(value) for key, value in opp_contract_probs_dict.items()
-    }
+    actor_bid_probs_dict = {}
+    opp_bid_probs_dict = {}
+    actor_contract_probs_dict = {}
+    opp_contract_probs_dict = {}
+    index = 0
+
+    for number in numbers:
+        for suit in suits:
+            actor_bid_probs_dict[
+                f"eval/actor_bid_probs/{number}{suit}"
+            ] = actor_bid_mean[index]
+            opp_bid_probs_dict[f"eval/opp_bid_probs/{number}{suit}"] = opp_bid_mean[
+                index
+            ]
+            actor_contract_probs_dict[
+                f"eval/actor_contract_probs/{number}{suit}"
+            ] = actor_contract_mean[index]
+            opp_contract_probs_dict[
+                f"eval/opp_contract_probs/{number}{suit}"
+            ] = opp_contract_mean[index]
+            index += 1
     log = {
         **log,
         **actor_bid_probs_dict,
@@ -858,6 +1093,7 @@ def make_evaluate_log(log_info):
         **opp_bid_probs_dict,
         **opp_contract_probs_dict,
     }
+
     return log
 
 
@@ -870,11 +1106,11 @@ if __name__ == "__main__":
         "OPP_ACTIVATION": "relu",
         "OPP_MODEL_TYPE": "DeepMind",
         "OPP_MODEL_PATH": "sl_params/params-300000.pkl",
-        "NUM_EVAL_ENVS": 2,
+        "NUM_EVAL_ENVS": 4,
         "LOG_PATH": "",
         "EXP_NAME": "",
         "PARAM_PATH": "sl_params/params-300000.pkl",
-        "TRACK": False,
+        "TRACK": True,
     }
     if config["TRACK"]:
         wandb.init(project="eval_test", config=config)
@@ -910,14 +1146,14 @@ if __name__ == "__main__":
     """
     # log = make_evaluate_log(log_info)
     # pprint(log)
-    du_eval_R, table_a_info, table_b_info = duplicate_evaluate(params, rng)
+    log_info, table_a_info, table_b_info = jax.jit(duplicate_evaluate)(params, rng)
     print(table_a_info)
     print(table_b_info)
-    print(du_eval_R)
-    print(du_eval_R.mean())
     # state.save_svg("svg/test_du.svg")
     # state.save_svg("svg/test.svg")
     # print(state)
+    log = jax.jit(make_evaluate_log)(log_info)
+    pprint(log)
 
     if config["TRACK"]:
         wandb.log(log)

@@ -11,12 +11,10 @@ import distrax
 import pgx.bridge_bidding as bb
 from src.utils import (
     auto_reset,
-    single_play_step_vs_policy_in_bridge_bidding,
-    single_play_step_vs_DeepMind_sl_model,
-    single_play_step_vs_DeepMind_sl_model_in_deterministic,
-    duplicate_play_step_vs_DeepMind_sl_model,
     single_play_step_two_policy_commpetitive,
     single_play_step_two_policy_commpetitive_deterministic,
+    single_play_step_free_run,
+    entropy_from_dif,
 )
 import time
 import os
@@ -40,12 +38,12 @@ print(jax.local_devices())
 
 class PPOConfig(BaseModel):
     ENV_NAME: Literal["bridge_bidding"] = "bridge_bidding"
-    LR: float = 0.00005  # 0.0003
+    LR: float = 0.000001  # 0.0003
     #    EVAL_ENVS: int = 100
     NUM_ENVS: int = 4096  # 並列pgx環境数　evalで計算されるゲーム数
     NUM_STEPS: int = 64
     TOTAL_TIMESTEPS: int = 200000000
-    UPDATE_EPOCHS: int = 2  # 一回のupdateでbatchが何回学習されるか
+    UPDATE_EPOCHS: int = 5  # 一回のupdateでbatchが何回学習されるか
     NUM_MINIBATCHES: int = 128
     GAMMA: float = 1
     GAE_LAMBDA: float = 0.95
@@ -61,16 +59,14 @@ class PPOConfig(BaseModel):
     OPP_ACTIVATION: str = "relu"
     OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
     OPP_MODEL_PATH: str = "sl_params/params-300000.pkl"
-    NUM_UPDATES: int = (
-        10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
-    )
+    NUM_UPDATES: int = 10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
     MINIBATCH_SIZE: int = 1024  # update中の1 epochで使用される数
     ANNEAL_LR: bool = False  # True
     VS_RANDOM: bool = False
     UPDATE_INTERVAL: int = 5
     MAKE_ANCHOR: bool = True
     REWARD_SCALE: float = 7600
-    NUM_EVAL_ENVS: int = 20000
+    NUM_EVAL_ENVS: int = 10000
     DDS_RESULTS_DIR: str = "dds_results"
     HASH_SIZE: int = 100_000
     TRAIN_SIZE: int = 12_500_000
@@ -81,6 +77,11 @@ class PPOConfig(BaseModel):
     EXP_NAME: str = "exp_0000"
     MODEL_SAVE_PATH: str = "rl_params"
     TRACK: bool = True
+    ACTOR_ILLEGAL_ACTION_MASK: bool = True
+    ACTOR_ILLEGAL_ACTION_PENALTY: bool = False
+    ILLEGAL_ACTION_PENALTY: float = -1
+    ILLEGAL_ACTION_L2NORM_COEF: float = 0
+    GAME_MODE: Literal["competitive", "free-run"] = "competitive"
 
 
 def linear_schedule(count):
@@ -120,18 +121,44 @@ def make_update_fn(config, env_step_fn, env_init_fn):
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
     )
-    opp_forward_pass = make_forward_pass(
-        activation=config["OPP_ACTIVATION"],
-        model_type=config["OPP_MODEL_TYPE"],
-    )
-    opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
+
+    def make_policy(config):
+        if config["ACTOR_ILLEGAL_ACTION_MASK"]:
+
+            def masked_policy(mask, logits):
+                logits = logits + jnp.finfo(np.float64).min * (~mask)
+                pi = distrax.Categorical(logits=logits)
+                return pi
+
+            return masked_policy
+        elif config["ACTOR_ILLEGAL_ACTION_PENALTY"]:
+
+            def no_masked_policy(mask, logits):
+                pi = distrax.Categorical(logits=logits)
+                return pi
+
+            return no_masked_policy
+
+    policy = make_policy(config)
+
+    if config["GAME_MODE"] == "competitive":
+        make_step_fn = single_play_step_two_policy_commpetitive
+        opp_forward_pass = make_forward_pass(
+            activation=config["OPP_ACTIVATION"],
+            model_type=config["OPP_MODEL_TYPE"],
+        )
+        opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
+    elif config["GAME_MODE"] == "free-run":
+        make_step_fn = single_play_step_free_run
+        opp_forward_pass = None
+        opp_params = None
 
     # TRAIN LOOP
     def _update_step(runner_state):
         # COLLECT TRAJECTORIES
 
         # step_fn = _make_step(config["ENV_NAME"], runner_state[0])  # DONE
-        step_fn = single_play_step_two_policy_commpetitive(
+        step_fn = make_step_fn(
             step_fn=auto_reset(env_step_fn, env_init_fn),
             actor_forward_pass=actor_forward_pass,
             actor_params=runner_state[0],
@@ -150,14 +177,13 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                 rng,
             ) = runner_state  # DONE
             actor = env_state.current_player
-            rng, _rng = jax.random.split(rng)
             logits, value = actor_forward_pass.apply(
                 params,
                 last_obs.astype(jnp.float32),
             )  # DONE
+            rng, _rng = jax.random.split(rng)
             mask = env_state.legal_action_mask
-            logits = logits + jnp.finfo(np.float64).min * (~mask)
-            pi = distrax.Categorical(logits=logits)
+            pi = policy(mask, logits)
             action = pi.sample(seed=_rng)
             log_prob = pi.log_prob(action)
             # STEP ENV
@@ -168,9 +194,7 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                 env_state.terminated,
                 action,
                 value,
-                jax.vmap(get_fn)(
-                    env_state.rewards / config["REWARD_SCALE"], actor
-                ),
+                jax.vmap(get_fn)(env_state.rewards / config["REWARD_SCALE"], actor),
                 log_prob,
                 last_obs,
                 mask,
@@ -188,7 +212,7 @@ def make_update_fn(config, env_step_fn, env_init_fn):
         runner_state, traj_batch = jax.lax.scan(
             _env_step, runner_state, None, config["NUM_STEPS"]
         )
-        print(traj_batch)
+        # print(traj_batch)
 
         # CALCULATE ADVANTAGE
         (
@@ -211,13 +235,8 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                     transition.value,
                     transition.reward,
                 )
-                delta = (
-                    reward + config["GAMMA"] * next_value * (1 - done) - value
-                )
-                gae = (
-                    delta
-                    + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
-                )
+                delta = reward + config["GAMMA"] * next_value * (1 - done) - value
+                gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
                 return (gae, value), gae
 
             """
@@ -251,8 +270,8 @@ def make_update_fn(config, env_step_fn, env_init_fn):
         # print(last_val)
 
         advantages, targets = _calculate_gae(traj_batch, last_val)
-        print(advantages)
-        print(targets)
+        # print(advantages)
+        # print(targets)
 
         # UPDATE NETWORK
         def _update_epoch(update_state, unused):
@@ -266,8 +285,7 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                         params, traj_batch.obs.astype(jnp.float32)
                     )  # DONE
                     mask = traj_batch.legal_action_mask
-                    logits = logits + jnp.finfo(np.float64).min * (~mask)
-                    pi = distrax.Categorical(logits=logits)
+                    pi = policy(mask, logits)
                     log_prob = pi.log_prob(traj_batch.action)
 
                     # CALCULATE VALUE LOSS
@@ -275,17 +293,13 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                         value - traj_batch.value
                     ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
                     value_losses = jnp.square(value - targets)
-                    value_losses_clipped = jnp.square(
-                        value_pred_clipped - targets
-                    )
+                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
                     value_loss = (
-                        0.5
-                        * jnp.maximum(
-                            value_losses, value_losses_clipped
-                        ).mean()
+                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
                     )
 
                     # CALCULATE ACTOR LOSS
+                    logratio = log_prob - traj_batch.log_prob
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
                     # gae標準化
@@ -301,14 +315,43 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                     )
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
-                    entropy = pi.entropy().mean()
 
+                    """
+                    illegal_action_masked_logits = logits + jnp.finfo(
+                        np.float64
+                    ).min * (~mask)
+                    illegal_action_masked_pi = distrax.Categorical(
+                        logits=illegal_action_masked_logits
+                    )
+                    entropy = illegal_action_masked_pi.entropy().mean()
+                    """
+                    entropy = jax.vmap(entropy_from_dif)(logits, mask).mean()
+
+                    pi = distrax.Categorical(logits=logits)
+                    illegal_action_probabilities = pi.probs * ~mask
+                    illegal_action_loss = (
+                        jnp.linalg.norm(illegal_action_probabilities, ord=2) / 2
+                    )
                     total_loss = (
                         loss_actor
                         + config["VF_COEF"] * value_loss
                         - config["ENT_COEF"] * entropy
+                        + config["ILLEGAL_ACTION_L2NORM_COEF"] * illegal_action_loss
                     )
-                    return total_loss, (value_loss, loss_actor, entropy)
+
+                    approx_kl = ((ratio - 1) - logratio).mean()
+                    clipflacs = jnp.float32(
+                        jnp.abs((ratio - 1.0)) > config["CLIP_EPS"]
+                    ).mean()
+
+                    return total_loss, (
+                        value_loss,
+                        loss_actor,
+                        entropy,
+                        approx_kl,
+                        clipflacs,
+                        illegal_action_loss,
+                    )
 
                 grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
                 total_loss, grads = grad_fn(
@@ -372,7 +415,7 @@ def make_update_fn(config, env_step_fn, env_init_fn):
         update_state, loss_info = jax.lax.scan(
             _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
         )
-        print(loss_info)
+        # print(loss_info)
         params, opt_state, _, _, _, rng = update_state  # DONE
 
         runner_state = (
@@ -426,6 +469,7 @@ def train(config, rng):
     duplicate_evaluate = make_evaluate(config, duplicate=True)
     jit_evaluate = jax.jit(evaluate)
     jit_diplicate_evaluate = jax.jit(duplicate_evaluate)
+    jit_make_evaluate_log = jax.jit(make_evaluate_log)
 
     # INIT UPDATE FUNCTION
     _update_step = make_update_fn(config, env.step, env.init)  # DONE
@@ -462,11 +506,7 @@ def train(config, rng):
 
     steps = 0
     train_dds_results_list = sorted(
-        [
-            path
-            for path in os.listdir(config["DDS_RESULTS_DIR"])
-            if "train" in path
-        ]
+        [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
     )
     hash_index = 0
     board_count = 0
@@ -483,8 +523,8 @@ def train(config, rng):
     for i in range(config["NUM_UPDATES"]):
         # eval
         time_eval_sta = time.time()
-        state, log_info = jit_evaluate(runner_state[0], eval_rng)  # DONE
-        du_eval_R = jit_diplicate_evaluate(runner_state[0], eval_rng)
+        # state, log_info = jit_evaluate(runner_state[0], eval_rng)  # DONE
+        log_info, _, _ = jit_diplicate_evaluate(runner_state[0], eval_rng)
         time_eval_end = time.time()
         print(f"eval time: {time_eval_end-time_eval_sta}")
         time1 = time.time()
@@ -515,16 +555,40 @@ def train(config, rng):
                 "wb",
             ) as writer:
                 pickle.dump(runner_state[1], writer)
-        total_loss, (value_loss, loss_actor, entropy) = loss_info
-        eval_log = make_evaluate_log(log_info)
+        total_loss, (
+            value_loss,
+            loss_actor,
+            entropy,
+            approx_kl,
+            clipflacs,
+            illegal_action_loss,
+        ) = loss_info
+        time_make_log_sta = time.time()
+        eval_log = jit_make_evaluate_log(log_info)
+        time_make_log_end = time.time()
+        print(f"make log time: {time_make_log_end -time_make_log_sta}")
+        """
+        print(value_loss)
+        print(value_loss.shape)
+        print(loss_actor)
+        print(loss_actor.shape)
+        print(entropy)
+        print(entropy.shape)
+        print(approx_kl)
+        print(approx_kl.shape)
+        print(clipflacs)
+        print(clipflacs.shape)
+        """
 
         # make log
         log = {
-            "train/total_loss": float(total_loss.mean().mean()),
-            "train/value_loss": float(value_loss.mean().mean()),
-            "train/loss_actor": float(loss_actor.mean().mean()),
-            "train/policy_entropy": float(entropy.mean().mean()),
-            "eval/IMP_reward": float(du_eval_R),
+            "train/total_loss": float(total_loss[-1][-1]),
+            "train/value_loss": float(value_loss[-1][-1]),
+            "train/loss_actor": float(loss_actor[-1][-1]),
+            "train/illegal_action_loss": float(illegal_action_loss[-1][-1]),
+            "train/policy_entropy": float(entropy[-1][-1]),
+            "train/clipflacs": float(clipflacs[-1][-1]),
+            "train/approx_kl": float(approx_kl[-1][-1]),
             "board_num": int(runner_state[4]),
             "steps": steps,
         }
@@ -605,9 +669,15 @@ if __name__ == "__main__":
         "LOG_PATH": args.LOG_PATH,
         "EXP_NAME": args.EXP_NAME,
         "TRACK": args.TRACK,
+        "ACTOR_ILLEGAL_ACTION_MASK": args.ACTOR_ILLEGAL_ACTION_MASK,
+        "ACTOR_ILLEGAL_ACTION_PENALTY": args.ACTOR_ILLEGAL_ACTION_PENALTY,
+        "ILLEGAL_ACTION_L2NORM_COEF": args.ILLEGAL_ACTION_L2NORM_COEF,
+        "GAME_MODE": args.GAME_MODE,
     }
     if args.TRACK:
-        key = "ffda4b38a6fd57db59331dd7ba8c7e316b179dd9"  # please specify your wandb key
+        key = (
+            "ffda4b38a6fd57db59331dd7ba8c7e316b179dd9"  # please specify your wandb key
+        )
         wandb.login(key=key)
         wandb.init(
             project=f"ppo-bridge",
@@ -617,9 +687,7 @@ if __name__ == "__main__":
         )
         os.mkdir(os.path.join(config["LOG_PATH"], config["EXP_NAME"]))
         config_file = open(
-            os.path.join(
-                config["LOG_PATH"], config["EXP_NAME"], "config.json"
-            ),
+            os.path.join(config["LOG_PATH"], config["EXP_NAME"], "config.json"),
             mode="w",
         )
         json.dump(
