@@ -48,7 +48,7 @@ NUM_PLAYERS = 4
 TOP_K_ACTIONS = 5  # How many alternative actions to display
 
 flags.DEFINE_integer("iterations", 400000, "Number of iterations")
-flags.DEFINE_string("data_path", "openspiel-data", "Location for data")
+flags.DEFINE_string("data_path", "dataset/openspiel-data", "Location for data")
 flags.DEFINE_integer("eval_every", 10000, "How often to evaluate the policy")
 flags.DEFINE_integer("num_examples", 3, "How many examples to print per evaluation")
 flags.DEFINE_integer("train_batch", 128, "Batch size for training step")
