@@ -28,7 +28,6 @@ from omegaconf import OmegaConf
 from pydantic import BaseModel
 import wandb
 
-from src.duplicate import duplicate_step
 from src.models import ActorCritic, make_forward_pass
 from src.evaluation import make_evaluate, make_evaluate_log
 
@@ -58,7 +57,7 @@ class PPOConfig(BaseModel):
     ACTOR_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "FAIR"
     OPP_ACTIVATION: str = "relu"
     OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
-    OPP_MODEL_PATH: str = "sl_params/params-300000.pkl"
+    OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
     NUM_UPDATES: int = 10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
     MINIBATCH_SIZE: int = 1024  # update中の1 epochで使用される数
     ANNEAL_LR: bool = False  # True
@@ -73,7 +72,7 @@ class PPOConfig(BaseModel):
     LOAD_INITIAL_MODEL: bool = False
     INITIAL_MODEL_PATH: str = "sl_fair_0_1/params-400000.pkl"
     SAVE_MODEL: bool = True
-    LOG_PATH: str = "log"
+    LOG_PATH: str = "rl_log"
     EXP_NAME: str = "exp_0000"
     MODEL_SAVE_PATH: str = "rl_params"
     TRACK: bool = True
@@ -316,7 +315,6 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                     loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
                     loss_actor = loss_actor.mean()
 
-                    """
                     illegal_action_masked_logits = logits + jnp.finfo(
                         np.float64
                     ).min * (~mask)
@@ -324,21 +322,22 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                         logits=illegal_action_masked_logits
                     )
                     entropy = illegal_action_masked_pi.entropy().mean()
-                    """
-                    entropy = jax.vmap(entropy_from_dif)(logits, mask).mean()
 
                     pi = distrax.Categorical(logits=logits)
                     illegal_action_probabilities = pi.probs * ~mask
                     illegal_action_loss = (
                         jnp.linalg.norm(illegal_action_probabilities, ord=2) / 2
                     )
+
                     total_loss = (
                         loss_actor
                         + config["VF_COEF"] * value_loss
                         - config["ENT_COEF"] * entropy
                         + config["ILLEGAL_ACTION_L2NORM_COEF"] * illegal_action_loss
                     )
-
+                    """
+                    total_loss = -config["ENT_COEF"] * entropy
+                    """
                     approx_kl = ((ratio - 1) - logratio).mean()
                     clipflacs = jnp.float32(
                         jnp.abs((ratio - 1.0)) > config["CLIP_EPS"]
@@ -596,7 +595,6 @@ def train(config, rng):
         pprint(log)
         if config["TRACK"]:
             wandb.log(total_log)
-
         if (runner_state[4] - board_count) // config["HASH_SIZE"] >= 1:
             hash_index += 1
             print(f"board count: {runner_state[4] - board_count}")
