@@ -59,6 +59,7 @@ def make_act(act_type):
 
 def make_evaluate(config, duplicate=False):
     eval_env = bb.BridgeBidding("dds_results/test_000.npy")
+    # eval_env = bb.BridgeBidding("workspace/100_hash.npy")
     actor_forward_pass = make_forward_pass(
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
@@ -110,6 +111,8 @@ def make_evaluate(config, duplicate=False):
         opp_step_count = jnp.zeros(num_eval_envs)
         actor_bid = jnp.zeros((num_eval_envs, 35))
         opp_bid = jnp.zeros((num_eval_envs, 35))
+        actor_pass_count = jnp.zeros(num_eval_envs)
+        opp_pass_count = jnp.zeros(num_eval_envs)
 
         def cond_fn(tup):
             (
@@ -177,6 +180,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ) = log_info
             illegal_pi = distrax.Categorical(logits=logits_old)
             illegal_action_prob = jnp.dot(illegal_pi.probs, ~mask)
@@ -210,6 +215,16 @@ def make_evaluate(config, duplicate=False):
                 lambda: opp_bid.at[action - 3].set(1),
                 lambda: opp_bid,
             )
+            actor_pass_count = jax.lax.cond(
+                (current_player < 2) & (action == 0),
+                actor_pass_count + 1,
+                actor_pass_count,
+            )
+            opp_pass_count = jax.lax.cond(
+                (current_player >= 2) & (action == 0),
+                opp_pass_count + 1,
+                opp_pass_count,
+            )
             return (
                 actor_total_illegal_action_probs,
                 opp_total_illegal_action_probs,
@@ -217,6 +232,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             )
 
         def make_step_log(state, logits_old, mask, current_player, action, log_info):
@@ -247,6 +264,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ) = jax.vmap(make_step_log)(
                 state, logits_old, mask, state.current_player, action, log_info
             )
@@ -281,6 +300,8 @@ def make_evaluate(config, duplicate=False):
                     opp_step_count,
                     actor_bid,
                     opp_bid,
+                    actor_pass_count,
+                    opp_pass_count,
                 ),
             )
 
@@ -302,6 +323,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ),
         ) = jax.lax.while_loop(
             cond_fn,
@@ -316,6 +339,8 @@ def make_evaluate(config, duplicate=False):
                     opp_step_count,
                     actor_bid,
                     opp_bid,
+                    actor_pass_count,
+                    opp_pass_count,
                 ),
             ),
         )
@@ -452,7 +477,6 @@ def make_evaluate(config, duplicate=False):
         opp_illegal_action_probs = jax.vmap(lambda x, y: x / y)(
             opp_total_illegal_action_probs, opp_step_count
         )
-
         """
         print(state)
         state.save_svg("svg/test_eval.svg")
@@ -542,6 +566,8 @@ def make_evaluate(config, duplicate=False):
         opp_step_count = jnp.zeros(num_eval_envs)
         actor_bid = jnp.zeros((num_eval_envs, 35))
         opp_bid = jnp.zeros((num_eval_envs, 35))
+        actor_pass_count = jnp.zeros(num_eval_envs)
+        opp_pass_count = jnp.zeros(num_eval_envs)
         count = 0
 
         def cond_fn(tup):
@@ -587,6 +613,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ) = log_info
             illegal_action_prob = jnp.dot(pi_probs, ~mask)
             actor_total_illegal_action_probs = jax.lax.cond(
@@ -619,6 +647,16 @@ def make_evaluate(config, duplicate=False):
                 lambda: jnp.zeros(35).at[action - 3].set(1) + opp_bid,
                 lambda: opp_bid,
             )
+            actor_pass_count = jax.lax.cond(
+                (current_player < 2) & (action == 0),
+                lambda: actor_pass_count + 1,
+                lambda: actor_pass_count,
+            )
+            opp_pass_count = jax.lax.cond(
+                (current_player >= 2) & (action == 0),
+                lambda: opp_pass_count + 1,
+                lambda: opp_pass_count,
+            )
             return (
                 actor_total_illegal_action_probs,
                 opp_total_illegal_action_probs,
@@ -626,6 +664,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             )
 
         def make_step_log(state, pi_probs, action, log_info):
@@ -660,6 +700,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ) = jax.vmap(make_step_log)(state, pi_probs, action, log_info)
 
             """
@@ -702,6 +744,8 @@ def make_evaluate(config, duplicate=False):
                     opp_step_count,
                     actor_bid,
                     opp_bid,
+                    actor_pass_count,
+                    opp_pass_count,
                 ),
                 rng_key,
                 count,
@@ -742,6 +786,8 @@ def make_evaluate(config, duplicate=False):
                 opp_step_count,
                 actor_bid,
                 opp_bid,
+                actor_pass_count,
+                opp_pass_count,
             ),
             _,
             count,
@@ -760,6 +806,8 @@ def make_evaluate(config, duplicate=False):
                     opp_step_count,
                     actor_bid,
                     opp_bid,
+                    actor_pass_count,
+                    opp_pass_count,
                 ),
                 rng_key,
                 count,
@@ -1011,6 +1059,8 @@ def make_evaluate(config, duplicate=False):
             / 2,
             (table_a_opp_down_contract.mean() + table_b_opp_down_contract.mean()) / 2,
             (table_a_pass_out_ratio + table_b_pass_out_ratio) / 2,
+            (actor_pass_count / actor_step_count).mean(),
+            (opp_pass_count / opp_step_count).mean(),
         )
         return log_info, table_a_info, table_b_info
 
@@ -1042,6 +1092,8 @@ def make_evaluate_log(log_info):
         actor_down_contract_mean,
         opp_down_contract_mean,
         pass_out_ratio,
+        actor_pass_ratio,
+        opp_pass_ratio,
     ) = log_info
 
     log = {
@@ -1061,6 +1113,8 @@ def make_evaluate_log(log_info):
         "eval/actor_down_contract_ratio": actor_down_contract_mean,
         "eval/opp_down_contract_ratio": opp_down_contract_mean,
         "eval/pass_out_ratio": pass_out_ratio,
+        "eval/actor_pass_ratio": actor_pass_ratio,
+        "eval/opp_pass_ratio": opp_pass_ratio,
     }
 
     suits = ["C", "D", "H", "S", "NT"]
@@ -1102,15 +1156,16 @@ if __name__ == "__main__":
     wandb.login(key=key)
     config = {
         "ACTOR_ACTIVATION": "relu",
-        "ACTOR_MODEL_TYPE": "DeepMind",
+        "ACTOR_MODEL_TYPE": "FAIR",
         "OPP_ACTIVATION": "relu",
         "OPP_MODEL_TYPE": "DeepMind",
-        "OPP_MODEL_PATH": "sl_params/params-300000.pkl",
+        "OPP_MODEL_PATH": "sl_log/sl_deepmind/params-400000.pkl",
         "NUM_EVAL_ENVS": 4,
         "LOG_PATH": "",
         "EXP_NAME": "",
-        "PARAM_PATH": "sl_params/params-300000.pkl",
+        "PARAM_PATH": "rl_log/exp0067/rl_params/params-00000085.pkl",
         "TRACK": True,
+        "GAME_MODE": "competitive",
     }
     if config["TRACK"]:
         wandb.init(project="eval_test", config=config)
@@ -1147,6 +1202,7 @@ if __name__ == "__main__":
     # log = make_evaluate_log(log_info)
     # pprint(log)
     log_info, table_a_info, table_b_info = jax.jit(duplicate_evaluate)(params, rng)
+    print(make_evaluate_log(log_info))
     print(table_a_info)
     print(table_b_info)
     # state.save_svg("svg/test_du.svg")
