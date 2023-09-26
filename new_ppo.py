@@ -64,6 +64,7 @@ class PPOConfig(BaseModel):
     VS_RANDOM: bool = False
     UPDATE_INTERVAL: int = 5
     MAKE_ANCHOR: bool = True
+    REWARD_SCALING: bool = False
     REWARD_SCALE: float = 7600
     NUM_EVAL_ENVS: int = 10000
     DDS_RESULTS_DIR: str = "dds_results"
@@ -151,6 +152,23 @@ def make_update_fn(config, env_step_fn, env_init_fn):
         make_step_fn = single_play_step_free_run
         opp_forward_pass = None
         opp_params = None
+
+    def make_reward_scaling(config):
+        if config["REWARD_SCALING"]:
+
+            def reward_scaling(gae):
+                return (gae - gae.mean()) / (gae.std() + 1e-8)
+
+            return reward_scaling
+
+        else:
+
+            def no_scaling(gae):
+                return gae
+
+            return no_scaling
+
+    reward_scaling = make_reward_scaling(config)
 
     # TRAIN LOOP
     def _update_step(runner_state):
@@ -302,7 +320,7 @@ def make_update_fn(config, env_step_fn, env_init_fn):
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
 
                     # gae標準化
-                    gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                    gae = reward_scaling(gae)
                     loss_actor1 = ratio * gae
                     loss_actor2 = (
                         jnp.clip(
@@ -671,6 +689,7 @@ if __name__ == "__main__":
         "ACTOR_ILLEGAL_ACTION_PENALTY": args.ACTOR_ILLEGAL_ACTION_PENALTY,
         "ILLEGAL_ACTION_L2NORM_COEF": args.ILLEGAL_ACTION_L2NORM_COEF,
         "GAME_MODE": args.GAME_MODE,
+        "REWARD_SCALING": args.REWARD_SCALING,
     }
     if args.TRACK:
         key = (
