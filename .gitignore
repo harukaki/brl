@@ -1,6 +1,6 @@
 __pycache__/
-venv/*
 .vscode/*
+venv*/*
 
 # log folder for experiments
 wandb/
