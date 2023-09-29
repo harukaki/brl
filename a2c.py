@@ -15,7 +15,7 @@ from pydantic import BaseModel
 import wandb
 
 
-class PPOConfig(BaseModel):
+class A2CConfig(BaseModel):
     env_name: Literal[
         "minatar-breakout",
         "minatar-freeway",
@@ -25,18 +25,25 @@ class PPOConfig(BaseModel):
     ] = "minatar-breakout"
     seed: int = 0
     lr: float = 0.0003
-    num_envs: int = 4096
+    num_envs: int = 128
     num_eval_envs: int = 100
-    num_steps: int = 128
+    num_steps: int = 64
     total_timesteps: int = 20000000
-    update_epochs: int = 3
+    update_epochs: int = 1
     minibatch_size: int = 4096
+    # GAE config
     gamma: float = 0.99
     gae_lambda: float = 0.95
+    # PPO clipping
     clip_eps: float = 0.2
-    ent_coef: float = 0.01
     vf_coef: float = 0.5
+    # entropy regularization
+    ent_coef: float = 0.01
+    # PPO code optimaizatino
+    reward_scaling: bool = False
+    global_gradient_clipping: bool = False
     max_grad_norm: float = 0.5
+    # log config
     wandb_project: str = "pgx-minatar-ppo"
     save_model: bool = False
 
@@ -44,7 +51,7 @@ class PPOConfig(BaseModel):
         extra = "forbid"
 
 
-args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
+args = A2CConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 print(args, file=sys.stderr)
 env = pgx.make(str(args.env_name))
 
@@ -96,9 +103,25 @@ def forward_fn(x, is_eval=False):
 forward = hk.without_apply_rng(hk.transform(forward_fn))
 
 
-optimizer = optax.chain(
-    optax.clip_by_global_norm(args.max_grad_norm), optax.adam(args.lr, eps=1e-5)
-)
+# code optimaization
+if args.global_gradient_clipping:
+    optimizer = optax.chain(
+        optax.clip_by_global_norm(args.max_grad_norm), optax.adam(args.lr, eps=1e-5)
+    )
+else:
+    optimizer = optax.adam(args.lr, eps=1e-5)
+if args.reward_scaling:
+
+    def reward_scale(gae):
+        return (gae - gae.mean()) / (gae.std() + 1e-8)
+
+    reward_scaling = reward_scale
+else:
+
+    def no_scale(gae):
+        return gae
+
+    reward_scaling = no_scale
 
 
 class Transition(NamedTuple):
@@ -194,7 +217,7 @@ def make_update_fn():
 
                     # CALCULATE ACTOR LOSS
                     ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                    gae = (gae - gae.mean()) / (gae.std() + 1e-8)
+                    gae = reward_scaling(gae)
                     loss_actor1 = ratio * gae
                     loss_actor2 = (
                         jnp.clip(
