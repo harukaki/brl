@@ -25,20 +25,19 @@ class A2CConfig(BaseModel):
     ] = "minatar-breakout"
     seed: int = 0
     lr: float = 0.0003
-    num_envs: int = 128
+    num_envs: int = 64
     num_eval_envs: int = 100
     num_steps: int = 64
     total_timesteps: int = 20000000
     update_epochs: int = 1
-    minibatch_size: int = 4096
+    batch_size: int = 4096
     # GAE config
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    # PPO clipping
-    clip_eps: float = 0.2
-    vf_coef: float = 0.5
     # entropy regularization
     ent_coef: float = 0.01
+    # value loss
+    vf_coef: float = 0.5
     # PPO code optimaizatino
     reward_scaling: bool = False
     global_gradient_clipping: bool = False
@@ -55,9 +54,7 @@ args = A2CConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 print(args, file=sys.stderr)
 env = pgx.make(str(args.env_name))
 
-
 num_updates = args.total_timesteps // args.num_envs // args.num_steps
-num_minibatches = args.num_envs * args.num_steps // args.minibatch_size
 
 
 class ActorCritic(hk.Module):
@@ -194,84 +191,43 @@ def make_update_fn():
         advantages, targets = _calculate_gae(traj_batch, last_val)
 
         # UPDATE NETWORK
-        def _update_epoch(update_state, unused):
-            def _update_minbatch(tup, batch_info):
-                params, opt_state = tup
-                traj_batch, advantages, targets = batch_info
+        def _update_batch(tup, batch_info):
+            params, opt_state = tup
+            traj_batch, advantages, targets = batch_info
 
-                def _loss_fn(params, traj_batch, gae, targets):
-                    # RERUN NETWORK
-                    logits, value = forward.apply(params, traj_batch.obs)
-                    pi = distrax.Categorical(logits=logits)
-                    log_prob = pi.log_prob(traj_batch.action)
+            def _loss_fn(params, traj_batch, gae, targets):
+                # RERUN NETWORK
+                logits, value = forward.apply(params, traj_batch.obs)
+                pi = distrax.Categorical(logits=logits)
+                log_prob = pi.log_prob(traj_batch.action)
 
-                    # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (
-                        value - traj_batch.value
-                    ).clip(-args.clip_eps, args.clip_eps)
-                    value_losses = jnp.square(value - targets)
-                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = (
-                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                    )
+                # CALCULATE VALUE LOSS
+                value_loss = 0.5 * jnp.square(value - targets).mean()
 
-                    # CALCULATE ACTOR LOSS
-                    ratio = jnp.exp(log_prob - traj_batch.log_prob)
-                    gae = reward_scaling(gae)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
-                        jnp.clip(
-                            ratio,
-                            1.0 - args.clip_eps,
-                            1.0 + args.clip_eps,
-                        )
-                        * gae
-                    )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
-                    entropy = pi.entropy().mean()
+                # CALCULATE ACTOR LOSS
+                gae = reward_scaling(gae)
+                loss_actor = -log_prob * gae
+                loss_actor = loss_actor.mean()
+                entropy = pi.entropy().mean()
 
-                    total_loss = (
-                        loss_actor + args.vf_coef * value_loss - args.ent_coef * entropy
-                    )
-                    return total_loss, (value_loss, loss_actor, entropy)
+                total_loss = (
+                    loss_actor + args.vf_coef * value_loss - args.ent_coef * entropy
+                )
+                return total_loss, (value_loss, loss_actor, entropy)
 
-                grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                total_loss, grads = grad_fn(params, traj_batch, advantages, targets)
-                updates, opt_state = optimizer.update(grads, opt_state)
-                params = optax.apply_updates(params, updates)
-                return (params, opt_state), total_loss
+            grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
+            total_loss, grads = grad_fn(params, traj_batch, advantages, targets)
+            updates, opt_state = optimizer.update(grads, opt_state)
+            params = optax.apply_updates(params, updates)
+            return (params, opt_state), total_loss
 
-            params, opt_state, traj_batch, advantages, targets, rng = update_state
-            rng, _rng = jax.random.split(rng)
-            batch_size = args.minibatch_size * num_minibatches
-            assert (
-                batch_size == args.num_steps * args.num_envs
-            ), "batch size must be equal to number of steps * number of envs"
-            permutation = jax.random.permutation(_rng, batch_size)
-            batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
-            )
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(x, [num_minibatches, -1] + list(x.shape[1:])),
-                shuffled_batch,
-            )
-            (params, opt_state), total_loss = jax.lax.scan(
-                _update_minbatch, (params, opt_state), minibatches
-            )
-            update_state = (params, opt_state, traj_batch, advantages, targets, rng)
-            return update_state, total_loss
-
-        update_state = (params, opt_state, traj_batch, advantages, targets, rng)
-        update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, args.update_epochs
+        rng, _rng = jax.random.split(rng)
+        batch_size = args.batch_size
+        batch = (traj_batch, advantages, targets)
+        batch = jax.tree_util.tree_map(
+            lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
         )
-        params, opt_state, _, _, _, rng = update_state
-
+        (params, opt_state), loss_info = _update_batch((params, opt_state), batch)
         runner_state = (params, opt_state, env_state, last_obs, rng)
         return runner_state, loss_info
 
