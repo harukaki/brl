@@ -10,10 +10,12 @@ from pgx.bridge_bidding import (
     _convert_card_pgx_to_openspiel,
 )
 import os
-from models import make_forward_pass
+
+# from src.models import make_forward_pass
 import pickle
 import distrax
 
+"""
 train_dds_results_list = sorted(
     [
         path
@@ -21,14 +23,14 @@ train_dds_results_list = sorted(
         if ("train" in path) or ("test" in path)
     ]
 )
-N = 3
 """
-pgx_env = BridgeBidding(train_dds_results_list)
+N = 3
+
+pgx_env = BridgeBidding("100_hash.npy")
 init = jax.jit((pgx_env.init))
 step = jax.jit((pgx_env.step))
-"""
 act_randomly = jax.jit(act_randomly)
-
+"""
 print(train_dds_results_list)
 
 sl_forward_pass = make_forward_pass(
@@ -127,7 +129,8 @@ for file in train_dds_results_list:
 
             i += 1
 
-
+"""
+key = jax.random.PRNGKey(0)
 # visualize last case
 key, subkey = jax.random.split(key)
 pgx_state: pgx.State = init(subkey)
@@ -159,6 +162,7 @@ else:
         )
 
 # init hand
+
 openspiel_state = openspiel_env.new_initial_state()
 hand = pgx_state._hand.reshape(4, 13)
 hand = jnp.roll(hand, -pgx_state._dealer, axis=0)
@@ -176,11 +180,13 @@ while not pgx_state.terminated.all():
     print(f"{i:04d}")
     print("================")
     print(f"pgx curr_player: {pgx_state.current_player}\npgx action: {action}")
-    pgx_state.save_svg(f"test/{i:04d}.svg")
+    pgx_state.save_svg(f"svg/{i:04d}.svg")
     print(openspiel_state)
     valid = jnp.all(
         jnp.array(openspiel_state.observation_tensor()[4:484]) == pgx_state.observation
     )
+    print(f"spiel obs: {openspiel_state.observation_tensor()[4:484]}")
+    print(f"pgx obs: {pgx_state.observation}")
     print(f"obs valid: {valid}")
     if not valid:
         print(
