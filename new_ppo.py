@@ -82,6 +82,7 @@ class PPOConfig(BaseModel):
     ILLEGAL_ACTION_PENALTY: float = -1
     ILLEGAL_ACTION_L2NORM_COEF: float = 0
     GAME_MODE: Literal["competitive", "free-run"] = "competitive"
+    SEED: int = 0
 
 
 def linear_schedule(count):
@@ -690,6 +691,7 @@ if __name__ == "__main__":
         "ILLEGAL_ACTION_L2NORM_COEF": args.ILLEGAL_ACTION_L2NORM_COEF,
         "GAME_MODE": args.GAME_MODE,
         "REWARD_SCALING": args.REWARD_SCALING,
+        "SEED": args.SEED,
     }
     if args.TRACK:
         key = (
@@ -716,7 +718,7 @@ if __name__ == "__main__":
         config_file.close()
     pprint(config)
     print("training of", config["ENV_NAME"])
-    rng = jax.random.PRNGKey(0)
+    rng = jax.random.PRNGKey(config["SEED"])
     sta = time.time()
     out = train(config, rng)
     end = time.time()
