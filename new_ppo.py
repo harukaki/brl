@@ -83,6 +83,7 @@ class PPOConfig(BaseModel):
     ILLEGAL_ACTION_L2NORM_COEF: float = 0
     GAME_MODE: Literal["competitive", "free-run"] = "competitive"
     SEED: int = 0
+    SELF_PLAY: bool = False
 
 
 def linear_schedule(count):
@@ -143,7 +144,22 @@ def make_update_fn(config, env_step_fn, env_init_fn):
     policy = make_policy(config)
 
     if config["GAME_MODE"] == "competitive":
-        make_step_fn = single_play_step_two_policy_commpetitive
+        if config["SELF_PLAY"]:
+
+            def self_play_step_fn(
+                step_fn, actor_forward_pass, actor_params, opp_forward_pass, opp_params
+            ):
+                return single_play_step_two_policy_commpetitive(
+                    step_fn=step_fn,
+                    actor_forward_pass=actor_forward_pass,
+                    actor_params=actor_params,
+                    opp_forward_pass=actor_forward_pass,
+                    opp_params=actor_params,
+                )
+
+            make_step_fn = self_play_step_fn
+        else:
+            make_step_fn = single_play_step_two_policy_commpetitive
         opp_forward_pass = make_forward_pass(
             activation=config["OPP_ACTIVATION"],
             model_type=config["OPP_MODEL_TYPE"],
@@ -692,6 +708,7 @@ if __name__ == "__main__":
         "GAME_MODE": args.GAME_MODE,
         "REWARD_SCALING": args.REWARD_SCALING,
         "SEED": args.SEED,
+        "SELF_PLAY": args.SELF_PLAY,
     }
     if args.TRACK:
         key = (

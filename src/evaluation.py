@@ -217,13 +217,13 @@ def make_evaluate(config, duplicate=False):
             )
             actor_pass_count = jax.lax.cond(
                 (current_player < 2) & (action == 0),
-                actor_pass_count + 1,
-                actor_pass_count,
+                lambda: actor_pass_count + 1,
+                lambda: actor_pass_count,
             )
             opp_pass_count = jax.lax.cond(
                 (current_player >= 2) & (action == 0),
-                opp_pass_count + 1,
-                opp_pass_count,
+                lambda: opp_pass_count + 1,
+                lambda: opp_pass_count,
             )
             return (
                 actor_total_illegal_action_probs,
