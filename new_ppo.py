@@ -84,6 +84,7 @@ class PPOConfig(BaseModel):
     GAME_MODE: Literal["competitive", "free-run"] = "competitive"
     SEED: int = 0
     SELF_PLAY: bool = False
+    MODEL_ZOO: bool = False
 
 
 def linear_schedule(count):
@@ -117,6 +118,87 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     legal_action_mask: jnp.ndarray
 
+def roll_out(runner_state, ):
+    def _env_step(runner_state, unused):
+        (
+            params,
+            opt_state,
+            env_state,
+            last_obs,
+            terminated_count,
+            rng,
+        ) = runner_state  # DONE
+        actor = env_state.current_player
+        logits, value = actor_forward_pass.apply(
+            params,
+            last_obs.astype(jnp.float32),
+        )  # DONE
+        rng, _rng = jax.random.split(rng)
+        mask = env_state.legal_action_mask
+        pi = policy(mask, logits)
+        action = pi.sample(seed=_rng)
+        log_prob = pi.log_prob(action)
+        # STEP ENV
+        rng, _rng = jax.random.split(rng)
+        env_state = step_fn(env_state, action, _rng)
+        terminated_count += jnp.sum(env_state.terminated)
+        transition = Transition(
+            env_state.terminated,
+            action,
+            value,
+            jax.vmap(get_fn)(env_state.rewards / config["REWARD_SCALE"], actor),
+            log_prob,
+            last_obs,
+            mask,
+        )
+        runner_state = (
+            params,
+            opt_state,
+            env_state,
+            env_state.observation,
+            terminated_count,
+            rng,
+        )  # DONE
+        return runner_state, transition
+
+    runner_state, traj_batch = jax.lax.scan(
+        _env_step, runner_state, None, config["NUM_STEPS"]
+    )
+    return runner_state, traj_batch
+
+def calc_gae(runner_state, traj_batch):
+    # CALCULATE ADVANTAGE
+    (
+        params,
+        opt_state,
+        env_state,
+        last_obs,
+        terminated_count,
+        rng,
+    ) = runner_state  # DONE
+    _, last_val = actor_forward_pass.apply(
+        params, last_obs.astype(jnp.float32)
+    )  # DONE
+    
+    def _get_advantages(gae_and_next_value, transition):
+        gae, next_value = gae_and_next_value
+        done, value, reward = (
+            transition.done,
+            transition.value,
+            transition.reward,
+        )
+        delta = reward + config["GAMMA"] * next_value * (1 - done) - value
+        gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
+        return (gae, value), gae
+
+    _, advantages = jax.lax.scan(
+        _get_advantages,
+        (jnp.zeros_like(last_val), last_val),
+        traj_batch,
+        reverse=True,
+        unroll=16,
+    )
+    return advantages, advantages + traj_batch.value
 
 def make_update_fn(config, env_step_fn, env_init_fn):
     actor_forward_pass = make_forward_pass(
@@ -709,6 +791,7 @@ if __name__ == "__main__":
         "REWARD_SCALING": args.REWARD_SCALING,
         "SEED": args.SEED,
         "SELF_PLAY": args.SELF_PLAY,
+        "MODEL_ZOO": args.MODEL_ZOO
     }
     if args.TRACK:
         key = (
