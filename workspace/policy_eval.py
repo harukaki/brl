@@ -8,7 +8,7 @@ import pickle
 import wandb
 from src.models import make_forward_pass
 from pprint import pprint
-from src.visualizer import Visualizer
+from workspace.visualizer import Visualizer
 from pgx.bridge_bidding import BridgeBidding, _calculate_dds_tricks
 
 if __name__ == "__main__":
