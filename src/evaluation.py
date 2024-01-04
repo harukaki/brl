@@ -1,60 +1,202 @@
 import jax
 import jax.numpy as jnp
-import haiku as hk
 import numpy as np
 import optax
 from typing import Sequence, NamedTuple, Any, Literal, Type
 import distrax
 import os
 import pgx.bridge_bidding as bb
-
-
 import pickle
 import wandb
 from src.duplicate import duplicate_step, Table_info
 from src.models import make_forward_pass
+from src.utils import single_play_step_two_policy_commpetitive_deterministic
 from pprint import pprint
 
 
-"""
-def make_act(act_type):
-    if act_type == "param_act":
-        forward_pass = make_forward_pass()
+def make_simple_evaluate(config):
+    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
+    # eval_env = bb.BridgeBidding("workspace/100_hash.npy")
+    actor_forward_pass = make_forward_pass(
+        activation=config["ACTOR_ACTIVATION"],
+        model_type=config["ACTOR_MODEL_TYPE"],
+    )
+    opp_forward_pass = make_forward_pass(
+        activation=config["EVAL_OPP_ACTIVATION"],
+        model_type=config["EVAL_OPP_MODEL_TYPE"],
+    )
+    opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
+    num_eval_envs = config["NUM_EVAL_ENVS"]
 
-        def param_act(state, forward_pass, params):
-            logits_old, value = forward_pass.apply(
-                params, state.observation
+    def get_fn(x, i):
+        return x[i]
+
+    def simple_evaluate(actor_params, rng):
+        step_fn = single_play_step_two_policy_commpetitive_deterministic(
+            step_fn=eval_env.step,
+            actor_params=actor_params,
+            actor_forward_pass=actor_forward_pass,
+            opp_params=opp_params,
+            opp_forward_pass=opp_forward_pass,
+        )
+        rng_key, sub_key = jax.random.split(rng)
+        subkeys = jax.random.split(sub_key, num_eval_envs)
+        state = jax.vmap(eval_env.init)(subkeys)
+        R = jnp.zeros(num_eval_envs)
+
+        def cond_fn(tup):
+            state, _, _ = tup
+            return ~state.terminated.all()
+
+        def loop_fn(tup):
+            state, R, rng_key = tup
+            actor = state.current_player
+            logits, value = actor_forward_pass.apply(actor_params, state.observation)
+            logits = logits + jnp.finfo(np.float64).min * (~state.legal_action_mask)
+            pi = distrax.Categorical(logits=logits)
+            action = pi.mode()
+            rng_key, _rng = jax.random.split(rng_key)
+            state = step_fn(state, action, _rng)
+            R = R + jax.vmap(get_fn)(state.rewards, actor)
+            return state, R, rng_key
+
+        state, R, _ = jax.lax.while_loop(cond_fn, loop_fn, (state, R, rng_key))
+        return R.mean()
+
+    return simple_evaluate
+
+
+def make_simple_duplicate_evaluate(config):
+    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
+    team1_forward_pass = make_forward_pass(
+        activation=config["ACTOR_ACTIVATION"],
+        model_type=config["ACTOR_MODEL_TYPE"],
+    )
+    team2_forward_pass = team1_forward_pass
+    num_eval_envs = config["NUM_PRIORITIZED_ENVS"]
+
+    def duplicate_evaluate(
+        team1_params,
+        team2_params,
+        # num_eval_envs,
+        rng_key,
+    ):
+        step_fn = duplicate_step(eval_env.step)
+        rng_key, sub_key = jax.random.split(rng_key)
+        subkeys = jax.random.split(sub_key, num_eval_envs)
+        state = jax.vmap(eval_env.init)(subkeys)
+        # state.save_svg("svg/eval_init.svg")
+        cum_return = jnp.zeros(num_eval_envs)
+        table_a_info = Table_info(
+            terminated=state.terminated,
+            rewards=state.rewards,
+            last_bid=state._last_bid,
+            last_bidder=state._last_bidder,
+            call_x=state._call_x,
+            call_xx=state._call_xx,
+        )
+        table_b_info = Table_info(
+            terminated=state.terminated,
+            rewards=state.rewards,
+            last_bid=state._last_bid,
+            last_bidder=state._last_bidder,
+            call_x=state._call_x,
+            call_xx=state._call_xx,
+        )
+
+        cum_return = jnp.zeros(num_eval_envs)
+        count = 0
+
+        def get_fn(x, i):
+            return x[i]
+
+        def cond_fn(tup):
+            (state, _, _, _, _, _) = tup
+            return ~state.terminated.all()
+
+        def actor_make_action(state):
+            logits, value = team1_forward_pass.apply(
+                team1_params, state.observation
             )  # DONE
-            mask_logits = jnp.finfo(np.float64).min * (
+            masked_logits = logits + jnp.finfo(np.float64).min * (
                 ~state.legal_action_mask
             )
-            logits = logits_old + mask_logits
+            masked_pi = distrax.Categorical(logits=masked_logits)
             pi = distrax.Categorical(logits=logits)
-            return (
-                pi.mode(),
-                pi.probs,
-                logits,
-                state.legal_action_mask,
-                logits_old,
-                mask_logits,
+            return (masked_pi.mode(), pi.probs)
+
+        def opp_make_action(state):
+            logits, value = team2_forward_pass.apply(
+                team2_params, state.observation
+            )  # DONE
+            masked_logits = logits + jnp.finfo(np.float64).min * (
+                ~state.legal_action_mask
+            )
+            masked_pi = distrax.Categorical(logits=masked_logits)
+            pi = distrax.Categorical(logits=logits)
+            return (masked_pi.mode(), pi.probs)
+
+        def make_action(state):
+            return jax.lax.cond(
+                (state.current_player == 0) | (state.current_player == 1),
+                lambda: actor_make_action(state),
+                lambda: opp_make_action(state),
             )
 
-        return param_act
-    elif act_type == "pass_act":
-
-        def pass_act(state):
-            pi_probs = jnp.zeros(38).at[0].set(True)
+        def loop_fn(tup):
+            (
+                state,
+                table_a_info,
+                table_b_info,
+                cum_return,
+                rng_key,
+                count,
+            ) = tup
+            (action, pi_probs) = jax.vmap(make_action)(state)
+            rng_key, _rng = jax.random.split(rng_key)
+            (state, table_a_info, table_b_info) = jax.vmap(step_fn)(
+                state, action, table_a_info, table_b_info
+            )
+            cum_return = cum_return + jax.vmap(get_fn)(
+                state.rewards, jnp.zeros_like(state.current_player)
+            )
+            count += 1
+            # state.save_svg(f"svg/{count}.svg")
             return (
-                jnp.int32(0),
-                pi_probs,
-                jnp.float32(1),
-                state.legal_action_mask,
-                jnp.float32(1),
-                jnp.float32(1),
+                state,
+                table_a_info,
+                table_b_info,
+                cum_return,
+                rng_key,
+                count,
             )
 
-        return pass_act
-"""
+        (
+            state,
+            table_a_info,
+            table_b_info,
+            cum_return,
+            _,
+            count,
+        ) = jax.lax.while_loop(
+            cond_fn,
+            loop_fn,
+            (
+                state,
+                table_a_info,
+                table_b_info,
+                cum_return,
+                rng_key,
+                count,
+            ),
+        )
+        # state.save_svg("svg/duplicate.svg")
+        std_error = jnp.std(cum_return, ddof=1) / jnp.sqrt(len(cum_return))
+        win_rate = jnp.sum(cum_return > 0) / num_eval_envs
+        log_info = (cum_return.mean(), std_error, win_rate)
+        return log_info, table_a_info, table_b_info
+
+    return duplicate_evaluate
 
 
 def make_evaluate(config, duplicate=False):
@@ -65,18 +207,18 @@ def make_evaluate(config, duplicate=False):
         model_type=config["ACTOR_MODEL_TYPE"],
     )
     opp_forward_pass = make_forward_pass(
-        activation=config["OPP_ACTIVATION"],
-        model_type=config["OPP_MODEL_TYPE"],
+        activation=config["EVAL_OPP_ACTIVATION"],
+        model_type=config["EVAL_OPP_MODEL_TYPE"],
     )
-    opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
+    opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
     num_eval_envs = config["NUM_EVAL_ENVS"]
 
     if config["GAME_MODE"] == "competitive":
         opp_forward_pass = make_forward_pass(
-            activation=config["OPP_ACTIVATION"],
-            model_type=config["OPP_MODEL_TYPE"],
+            activation=config["EVAL_OPP_ACTIVATION"],
+            model_type=config["EVAL_OPP_MODEL_TYPE"],
         )
-        opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
+        opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
 
         def opp_make_action(state):
             logits, value = opp_forward_pass.apply(
@@ -115,11 +257,7 @@ def make_evaluate(config, duplicate=False):
         opp_pass_count = jnp.zeros(num_eval_envs)
 
         def cond_fn(tup):
-            (
-                state,
-                _,
-                _,
-            ) = tup
+            (state, _, _, _) = tup
             return ~state.terminated.all()
 
         def rl_make_action(state):
@@ -246,11 +384,7 @@ def make_evaluate(config, duplicate=False):
             )
 
         def loop_fn(tup):
-            (
-                state,
-                cum_return,
-                log_info,
-            ) = tup
+            (state, cum_return, log_info, rewards) = tup
 
             # current_player_position = _player_position(state.current_player, state)
 
@@ -269,22 +403,9 @@ def make_evaluate(config, duplicate=False):
             ) = jax.vmap(make_step_log)(
                 state, logits_old, mask, state.current_player, action, log_info
             )
-            """
-            print(f"terminated: {state.terminated}")
-            print(f"current player: {state.current_player}")
-            print(f"action prob: {probs}")
-            print(f"illegal action: {state.legal_action_mask}")
-            print(f"action: {action}")
-            print(f"act illegal action: {actor_total_illegal_action_probs}")
-            print(f"opp illegal action: {opp_total_illegal_action_probs}")
-            print(f"act step: {actor_step_count}")
-            print(f"opp step: {opp_step_count}")
-            print(f"act bid: {actor_bid}")
-            print(f"opp bid: {opp_bid}")
-            print(state)
-            state.save_svg("svg/test.svg")
-            """
+
             state = jax.vmap(step_fn)(state, action)
+            rewards += state.rewards
 
             cum_return = cum_return + jax.vmap(get_fn)(
                 state.rewards, jnp.zeros_like(state.current_player)
@@ -303,16 +424,10 @@ def make_evaluate(config, duplicate=False):
                     actor_pass_count,
                     opp_pass_count,
                 ),
+                rewards,
             )
 
-        """
-        def while_loop(cond_fun, body_fun, init_val):
-            val = init_val
-            while cond_fun(val):
-                val = body_fun(val)
-            return val
-        """
-
+        rewards = jnp.zeros_like(state.rewards)
         (
             state,
             cum_return,
@@ -326,6 +441,7 @@ def make_evaluate(config, duplicate=False):
                 actor_pass_count,
                 opp_pass_count,
             ),
+            rewards,
         ) = jax.lax.while_loop(
             cond_fn,
             loop_fn,
@@ -342,6 +458,7 @@ def make_evaluate(config, duplicate=False):
                     actor_pass_count,
                     opp_pass_count,
                 ),
+                rewards,
             ),
         )
 
@@ -477,39 +594,7 @@ def make_evaluate(config, duplicate=False):
         opp_illegal_action_probs = jax.vmap(lambda x, y: x / y)(
             opp_total_illegal_action_probs, opp_step_count
         )
-        """
-        print(state)
-        state.save_svg("svg/test_eval.svg")
-        print(f"cum_return: {cum_return}")
-        print(f"actor_total_illegal_action_probs: {actor_total_illegal_action_probs}")
-        print(f"opp_total_illegal_action_probs: {opp_total_illegal_action_probs}")
-        print(f"actor_illegal_action_probs: {actor_illegal_action_probs}")
-        print(f"opp_illegal_action_probs: {opp_illegal_action_probs}")
-        print(f"actor_bid: {actor_bid}")
-        print(f"actor_bid.mean: {actor_bid.mean(axis=0)}")
-        print(f"actor_contract: {actor_contract}")
-        print(f"actor_contract.mean: {actor_contract.mean(axis=0)}")
-        print(f"opp_bid: {opp_bid}")
-        print(f"opp_bid.mean: {opp_bid.mean(axis=0)}")
-        print(f"opp_contract: {opp_contract}")
-        print(f"opp_contract.mean: {opp_contract.mean(axis=0)}")
-        print(f"actor_declarer_count: {actor_declarer_count}")
-        print(f"actor_declarer_ratio: {actor_declarer_ratio}")
-        print(f"opp_declarer_count: {opp_declarer_count}")
-        print(f"opp_declarer_ratio: {opp_declarer_ratio}")
-        print(f"actor_doubled_count: {actor_doubled_count}")
-        print(f"actor_doubled_ratio: {actor_doubled_ratio}")
-        print(f"actor_redoubled_count: {actor_redoubled_count}")
-        print(f"actor_redoubled_ratio: {actor_redoubled_ratio}")
-        print(f"opp_doubled_count: {opp_doubled_count}")
-        print(f"opp_doubled_ratio: {opp_doubled_ratio}")
-        print(f"opp_redoubled_count: {opp_redoubled_count}")
-        print(f"opp_redoubled_ratio: {opp_redoubled_ratio}")
-        print(f"actor_make_contract_ratio: {actor_make_contract.mean()}")
-        print(f"opp_make_contract_ratio: {opp_make_contract.mean()}")
-        print(f"actor_down_contract_ratio: {actor_down_contract.mean()}")
-        print(f"opp_down_contract_ratio: {opp_down_contract.mean()}")
-        """
+        state = state.replace(rewards=rewards)
         log_info = (
             cum_return.mean(),
             actor_illegal_action_probs.mean(),
@@ -584,19 +669,6 @@ def make_evaluate(config, duplicate=False):
             masked_pi = distrax.Categorical(logits=masked_logits)
             pi = distrax.Categorical(logits=logits)
             return (masked_pi.mode(), pi.probs)
-
-        """
-        def opp_make_action(state):
-            logits, value = opp_forward_pass.apply(
-                opp_params, state.observation
-            )  # DONE
-            masked_logits = logits + jnp.finfo(np.float64).min * (
-                ~state.legal_action_mask
-            )
-            masked_pi = distrax.Categorical(logits=masked_logits)
-            pi = distrax.Categorical(logits=logits)
-            return (masked_pi.mode(), pi.probs)
-        """
 
         def make_action(state):
             return jax.lax.cond(
@@ -704,25 +776,6 @@ def make_evaluate(config, duplicate=False):
                 opp_pass_count,
             ) = jax.vmap(make_step_log)(state, pi_probs, action, log_info)
 
-            """
-            print(f"terminated: {state.terminated}")
-            print(f"current player: {state.current_player}")
-            # print(f"masked action prob: {masked_pi_probs}")
-            print(f"action prob: {pi_probs}")
-            print(f"illegal action: {~state.legal_action_mask}")
-            print(
-                f"illegal action probs: {jax.vmap(jnp.dot)(pi_probs, ~state.legal_action_mask)}"
-            )
-            print(f"action: {action}")
-            print(f"act illegal action: {actor_total_illegal_action_probs}")
-            print(f"opp illegal action: {opp_total_illegal_action_probs}")
-            print(f"act step: {actor_step_count}")
-            print(f"opp step: {opp_step_count}")
-            print(f"act bid: {actor_bid}")
-            print(f"opp bid: {opp_bid}")
-            print(state._bidding_history)
-            # state.save_svg("svg/test.svg")
-            """
             rng_key, _rng = jax.random.split(rng_key)
             (state, table_a_info, table_b_info) = jax.vmap(step_fn)(
                 state, action, table_a_info, table_b_info
@@ -751,29 +804,6 @@ def make_evaluate(config, duplicate=False):
                 count,
             )
 
-        """
-        (
-            state,
-            table_a_info,
-            table_b_info,
-            cum_return,
-            _,
-        ) = jax.lax.while_loop(
-            cond_fn,
-            loop_fn,
-            (state, table_a_info, table_b_info, cum_return, rng_key),
-        )
-
-        """
-
-        """
-        def while_loop(cond_fun, body_fun, init_val):
-            val = init_val
-            while cond_fun(val):
-                val = body_fun(val)
-                # print(val[0]
-            return val
-        """
         (
             state,
             table_a_info,
@@ -920,19 +950,7 @@ def make_evaluate(config, duplicate=False):
         opp_illegal_action_probs = jax.vmap(lambda x, y: x / y)(
             opp_total_illegal_action_probs, opp_step_count
         )
-        """
-        print(state)
-        state.save_svg("svg/test_eval.svg")
-        print(f"cum_return: {cum_return}")
-        print(f"actor_total_illegal_action_probs: {actor_total_illegal_action_probs}")
-        print(f"opp_total_illegal_action_probs: {opp_total_illegal_action_probs}")
-        print(f"actor_illegal_action_probs: {actor_illegal_action_probs}")
-        print(f"opp_illegal_action_probs: {opp_illegal_action_probs}")
-        print(f"actor_bid: {actor_bid}")
-        print(f"actor_bid.mean: {actor_bid.mean(axis=0)}")
-        print(f"opp_bid: {opp_bid}")
-        print(f"opp_bid.mean: {opp_bid.mean(axis=0)}")
-        """
+
         table_a_pass_out, (
             table_a_actor_contract,
             table_a_opp_contract,
@@ -957,27 +975,6 @@ def make_evaluate(config, duplicate=False):
         table_a_score_reward = jax.vmap(get_fn)(
             table_a_info.rewards, jnp.zeros_like(state.current_player)
         )
-        """
-        print(table_a_info)
-        print(f"table_a_actor_contract: {table_a_actor_contract}")
-        print(f"table_a_actor_contract.mean: {table_a_actor_contract.mean(axis=0)}")
-        print(f"table_a_opp_contract: {table_a_opp_contract}")
-        print(f"table_a_opp_contract.mean: {table_a_opp_contract.mean(axis=0)}")
-        print(f"table_a_actor_declarer_count: {table_a_actor_declarer_count}")
-        print(f"table_a_opp_declarer_count: {table_a_opp_declarer_count}")
-        print(f"table_a_actor_doubled_count: {table_a_actor_doubled_count}")
-        print(f"table_a_actor_redoubled_count: {table_a_actor_redoubled_count}")
-        print(f"table_a_opp_doubled_count: {table_a_opp_doubled_count}")
-        print(f"opp_redoubled_count: {table_a_opp_redoubled_count}")
-        print(
-            f"table_a_actor_make_contract_ratio: {table_a_actor_make_contract.mean()}"
-        )
-        print(f"table_a_opp_make_contract_ratio: {table_a_opp_make_contract.mean()}")
-        print(
-            f"table_a_actor_down_contract_ratio: {table_a_actor_down_contract.mean()}"
-        )
-        print(f"table_a_opp_down_contract_ratio: {table_a_opp_down_contract.mean()}")
-        """
         table_b_pass_out, (
             table_b_actor_contract,
             table_b_opp_contract,
@@ -1002,28 +999,10 @@ def make_evaluate(config, duplicate=False):
         table_b_score_reward = jax.vmap(get_fn)(
             table_b_info.rewards, jnp.zeros_like(state.current_player)
         )
-        """
-        print(f"table_b_actor_contract: {table_b_actor_contract}")
-        print(f"table_b_actor_contract.mean: {table_b_actor_contract.mean(axis=0)}")
-        print(f"table_b_opp_contract: {table_b_opp_contract}")
-        print(f"table_b_opp_contract.mean: {table_b_opp_contract.mean(axis=0)}")
-        print(f"table_b_actor_declarer_count: {table_b_actor_declarer_count}")
-        print(f"table_b_opp_declarer_count: {table_b_opp_declarer_count}")
-        print(f"table_b_actor_doubled_count: {table_b_actor_doubled_count}")
-        print(f"table_b_actor_redoubled_count: {table_b_actor_redoubled_count}")
-        print(f"table_b_opp_doubled_count: {table_b_opp_doubled_count}")
-        print(f"opp_redoubled_count: {table_b_opp_redoubled_count}")
-        print(
-            f"table_b_actor_make_contract_ratio: {table_b_actor_make_contract.mean()}"
-        )
-        print(f"table_b_opp_make_contract_ratio: {table_b_opp_make_contract.mean()}")
-        print(
-            f"table_b_actor_down_contract_ratio: {table_b_actor_down_contract.mean()}"
-        )
-        print(f"table_b_opp_down_contract_ratio: {table_b_opp_down_contract.mean()}")
-        """
+        std_error = jnp.std(cum_return, ddof=1) / jnp.sqrt(len(cum_return))
         log_info = (
             cum_return.mean(),
+            std_error,
             (table_a_score_reward.mean() + table_b_score_reward.mean()) / 2,
             actor_illegal_action_probs.mean(),
             opp_illegal_action_probs.mean(),
@@ -1073,6 +1052,7 @@ def make_evaluate(config, duplicate=False):
 def make_evaluate_log(log_info):
     (
         IMP_return_mean,
+        std_error,
         score_return_mean,
         actor_illegal_action_probs_mean,
         opp_illegal_action_probs_mean,
@@ -1098,6 +1078,7 @@ def make_evaluate_log(log_info):
 
     log = {
         "eval/IMP_reward": IMP_return_mean,
+        "eval/IMP_SE": std_error,
         "eval/score_reward": score_return_mean,
         "eval/actor_illegal_action_probs": actor_illegal_action_probs_mean,
         "eval/opp_illegal_action_probs": opp_illegal_action_probs_mean,

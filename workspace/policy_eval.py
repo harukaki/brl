@@ -8,6 +8,8 @@ import pickle
 import wandb
 from src.models import make_forward_pass
 from pprint import pprint
+from src.visualizer import Visualizer
+from pgx.bridge_bidding import BridgeBidding, _calculate_dds_tricks
 
 if __name__ == "__main__":
     key = "ffda4b38a6fd57db59331dd7ba8c7e316b179dd9"  # please specify your wandb key
@@ -15,15 +17,17 @@ if __name__ == "__main__":
     config = {
         "ACTOR_ACTIVATION": "relu",
         "ACTOR_MODEL_TYPE": "FAIR",
-        "OPP_ACTIVATION": "relu",
-        "OPP_MODEL_TYPE": "DeepMind",
-        "OPP_MODEL_PATH": "sl_log/sl_deepmind/params-400000.pkl",
-        "NUM_EVAL_ENVS": 100,
+        "EVAL_OPP_ACTIVATION": "relu",
+        "EVAL_OPP_MODEL_TYPE": "FAIR",
+        # "EVAL_OPP_MODEL_PATH": "sl_log/sl_deepmind/params-400000.pkl",
+        "EVAL_OPP_MODEL_PATH": "rl_log/exp0091/rl_params/params-00000761.pkl",
+        "NUM_EVAL_ENVS": 4,
         "LOG_PATH": "rl_log",
-        "EXP_NAME": "exp0090",
-        "PARAM_PATH": "rl_params/params-00000289.pkl",
-        "TRACK": True,
+        "EXP_NAME": "exp0091",
+        "PARAM_PATH": "rl_params/params-00000761.pkl",
+        "TRACK": False,
         "GAME_MODE": "competitive",
+        "SVG_NAME": "1.svg",
     }
     if config["TRACK"]:
         wandb.init(project="eval_test", config=config)
@@ -54,6 +58,14 @@ if __name__ == "__main__":
     print(table_b_info)
     log = jax.jit(make_evaluate_log)(log_info)
     pprint(log)
-
+    evaluation = make_evaluate(config)
+    state, log_info = jax.jit(evaluation)(params, _rng)
+    pprint(log_info)
+    v = Visualizer()
+    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
+    v.get_dwg(states=state, env=eval_env).saveas(
+        os.path.join(config["LOG_PATH"], config["EXP_NAME"], config["SVG_NAME"])
+    )
+    print(state)
     if config["TRACK"]:
         wandb.log(log)

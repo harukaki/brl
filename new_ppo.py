@@ -3,22 +3,12 @@ This code is based on https://github.com/luchris429/purejaxrl
 """
 import jax
 import jax.numpy as jnp
-import haiku as hk
 import numpy as np
 import optax
-from typing import NamedTuple, Any, Literal
-import distrax
+from typing import NamedTuple, Literal
 import pgx.bridge_bidding as bb
-from src.utils import (
-    auto_reset,
-    single_play_step_two_policy_commpetitive,
-    single_play_step_two_policy_commpetitive_deterministic,
-    single_play_step_free_run,
-    entropy_from_dif,
-)
 import time
 import os
-import random
 import json
 from pprint import pprint
 
@@ -28,8 +18,17 @@ from omegaconf import OmegaConf
 from pydantic import BaseModel
 import wandb
 
-from src.models import ActorCritic, make_forward_pass
-from src.evaluation import make_evaluate, make_evaluate_log
+from src.models import make_forward_pass
+from src.evaluation import (
+    make_evaluate,
+    make_evaluate_log,
+    make_simple_evaluate,
+    make_simple_duplicate_evaluate,
+)
+from src.roll_out import make_roll_out
+from src.gae import make_calc_gae
+from src.update import make_update_step
+
 
 print(jax.default_backend())
 print(jax.local_devices())
@@ -37,54 +36,78 @@ print(jax.local_devices())
 
 class PPOConfig(BaseModel):
     ENV_NAME: Literal["bridge_bidding"] = "bridge_bidding"
+    SEED: int = 0
     LR: float = 0.000001  # 0.0003
-    #    EVAL_ENVS: int = 100
-    NUM_ENVS: int = 4096  # 並列pgx環境数　evalで計算されるゲーム数
-    NUM_STEPS: int = 64
-    TOTAL_TIMESTEPS: int = 200000000
-    UPDATE_EPOCHS: int = 5  # 一回のupdateでbatchが何回学習されるか
+    NUM_ENVS: int = 8192
+    NUM_STEPS: int = 32
+    TOTAL_TIMESTEPS: int = 2_621_440_000
+    UPDATE_EPOCHS: int = 10  # 一回のupdateでbatchが何回学習されるか
     NUM_MINIBATCHES: int = 128
-    GAMMA: float = 1
-    GAE_LAMBDA: float = 0.95
-    # GAMMA: float = 0.99
-    # GAE_LAMBDA: float = 0.95
-    CLIP_EPS: float = 0.2
-    # ENT_COEF: float = 0.01
-    ENT_COEF: float = 0
-    VF_COEF: float = 0.5
-    MAX_GRAD_NORM: float = 0.5
-    ACTOR_ACTIVATION: str = "relu"
-    ACTOR_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "FAIR"
-    OPP_ACTIVATION: str = "relu"
-    OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
-    OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
     NUM_UPDATES: int = 10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
     MINIBATCH_SIZE: int = 1024  # update中の1 epochで使用される数
-    ANNEAL_LR: bool = False  # True
-    VS_RANDOM: bool = False
-    UPDATE_INTERVAL: int = 5
-    MAKE_ANCHOR: bool = True
-    REWARD_SCALING: bool = False
-    REWARD_SCALE: float = 7600
-    NUM_EVAL_ENVS: int = 10000
+    # dataset config
     DDS_RESULTS_DIR: str = "dds_results"
     HASH_SIZE: int = 100_000
     TRAIN_SIZE: int = 12_500_000
-    LOAD_INITIAL_MODEL: bool = False
-    INITIAL_MODEL_PATH: str = "sl_fair_0_1/params-400000.pkl"
+    HASH_TABLE_NUM: int = 125
+    # eval config
+    NUM_EVAL_ENVS: int = 10000
+    EVAL_OPP_ACTIVATION: str = "relu"
+    EVAL_OPP_MODEL_TYPE: Literal[
+        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
+    ] = "DeepMind"
+    EVAL_OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
+    NUM_EVAL_STEP: int = 10
+    # log config
     SAVE_MODEL: bool = True
+    SAVE_MODEL_INTERVAL: int = 1
     LOG_PATH: str = "rl_log"
     EXP_NAME: str = "exp_0000"
     MODEL_SAVE_PATH: str = "rl_params"
     TRACK: bool = True
+
+    # actor config
+    LOAD_INITIAL_MODEL: bool = True
+    INITIAL_MODEL_PATH: str = "sl_log/sl_deepmind_actor_critic/params-400000.pkl"
+    ACTOR_ACTIVATION: str = "relu"
+    ACTOR_MODEL_TYPE: Literal[
+        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
+    ] = "DeepMind"
+    # opposite config
+    GAME_MODE: Literal["competitive", "free-run"] = "competitive"
+    SELF_PLAY: bool = True
+    OPP_ACTIVATION: str = "relu"
+    OPP_MODEL_TYPE: Literal[
+        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
+    ] = "DeepMind"
+    OPP_MODEL_PATH: str = None
+    MODEL_ZOO_RATIO: float = 0
+    MODEL_ZOO_NUM: int = 50_000
+    MODEL_ZOO_THRESHOLD: float = -24
+    PRIORITIZED_FICTITIOUS: bool = False
+    PRIOR_T: float = 1
+    NUM_PRIORITIZED_ENVS: int = 100
+
+    # GAE config
+    GAMMA: float = 1
+    GAE_LAMBDA: float = 0.95
+    # loss config
+    CLIP_EPS: float = 0.2
+    ENT_COEF: float = 0.001
+    VF_COEF: float = 0.5
+    # PPO code optimaization
+    VALUE_CLIPPING: bool = True
+    GLOBAL_GRADIENT_CLIPPING: bool = True
+    ANNEAL_LR: bool = False  # True
+    REWARD_SCALING: bool = False
+    MAX_GRAD_NORM: float = 0.5
+    REWARD_SCALE: float = 7600
+
+    # illegal action config
     ACTOR_ILLEGAL_ACTION_MASK: bool = True
     ACTOR_ILLEGAL_ACTION_PENALTY: bool = False
     ILLEGAL_ACTION_PENALTY: float = -1
     ILLEGAL_ACTION_L2NORM_COEF: float = 0
-    GAME_MODE: Literal["competitive", "free-run"] = "competitive"
-    SEED: int = 0
-    SELF_PLAY: bool = False
-    MODEL_ZOO: bool = False
 
 
 def linear_schedule(count):
@@ -98,15 +121,22 @@ def linear_schedule(count):
 
 args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 if args.ANNEAL_LR:
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(args.MAX_GRAD_NORM),
-        optax.adam(learning_rate=linear_schedule, eps=1e-5),
-    )
+    if args.GLOBAL_GRADIENT_CLIPPING:
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(args.MAX_GRAD_NORM),
+            optax.adam(learning_rate=linear_schedule, eps=1e-5),
+        )
+    else:
+        optimizer = optax.adam(learning_rate=linear_schedule, eps=1e-5)
+
 else:
-    optimizer = optax.chain(
-        optax.clip_by_global_norm(args.MAX_GRAD_NORM),
-        optax.adam(args.LR, eps=1e-5),
-    )
+    if args.GLOBAL_GRADIENT_CLIPPING:
+        optimizer = optax.chain(
+            optax.clip_by_global_norm(args.MAX_GRAD_NORM),
+            optax.adam(args.LR, eps=1e-5),
+        )
+    else:
+        optimizer = optax.adam(args.LR, eps=1e-5)
 
 
 class Transition(NamedTuple):
@@ -118,441 +148,9 @@ class Transition(NamedTuple):
     obs: jnp.ndarray
     legal_action_mask: jnp.ndarray
 
-def roll_out(runner_state, ):
-    def _env_step(runner_state, unused):
-        (
-            params,
-            opt_state,
-            env_state,
-            last_obs,
-            terminated_count,
-            rng,
-        ) = runner_state  # DONE
-        actor = env_state.current_player
-        logits, value = actor_forward_pass.apply(
-            params,
-            last_obs.astype(jnp.float32),
-        )  # DONE
-        rng, _rng = jax.random.split(rng)
-        mask = env_state.legal_action_mask
-        pi = policy(mask, logits)
-        action = pi.sample(seed=_rng)
-        log_prob = pi.log_prob(action)
-        # STEP ENV
-        rng, _rng = jax.random.split(rng)
-        env_state = step_fn(env_state, action, _rng)
-        terminated_count += jnp.sum(env_state.terminated)
-        transition = Transition(
-            env_state.terminated,
-            action,
-            value,
-            jax.vmap(get_fn)(env_state.rewards / config["REWARD_SCALE"], actor),
-            log_prob,
-            last_obs,
-            mask,
-        )
-        runner_state = (
-            params,
-            opt_state,
-            env_state,
-            env_state.observation,
-            terminated_count,
-            rng,
-        )  # DONE
-        return runner_state, transition
-
-    runner_state, traj_batch = jax.lax.scan(
-        _env_step, runner_state, None, config["NUM_STEPS"]
-    )
-    return runner_state, traj_batch
-
-def calc_gae(runner_state, traj_batch):
-    # CALCULATE ADVANTAGE
-    (
-        params,
-        opt_state,
-        env_state,
-        last_obs,
-        terminated_count,
-        rng,
-    ) = runner_state  # DONE
-    _, last_val = actor_forward_pass.apply(
-        params, last_obs.astype(jnp.float32)
-    )  # DONE
-    
-    def _get_advantages(gae_and_next_value, transition):
-        gae, next_value = gae_and_next_value
-        done, value, reward = (
-            transition.done,
-            transition.value,
-            transition.reward,
-        )
-        delta = reward + config["GAMMA"] * next_value * (1 - done) - value
-        gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
-        return (gae, value), gae
-
-    _, advantages = jax.lax.scan(
-        _get_advantages,
-        (jnp.zeros_like(last_val), last_val),
-        traj_batch,
-        reverse=True,
-        unroll=16,
-    )
-    return advantages, advantages + traj_batch.value
-
-def make_update_fn(config, env_step_fn, env_init_fn):
-    actor_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
-    )
-
-    def make_policy(config):
-        if config["ACTOR_ILLEGAL_ACTION_MASK"]:
-
-            def masked_policy(mask, logits):
-                logits = logits + jnp.finfo(np.float64).min * (~mask)
-                pi = distrax.Categorical(logits=logits)
-                return pi
-
-            return masked_policy
-        elif config["ACTOR_ILLEGAL_ACTION_PENALTY"]:
-
-            def no_masked_policy(mask, logits):
-                pi = distrax.Categorical(logits=logits)
-                return pi
-
-            return no_masked_policy
-
-    policy = make_policy(config)
-
-    if config["GAME_MODE"] == "competitive":
-        if config["SELF_PLAY"]:
-
-            def self_play_step_fn(
-                step_fn, actor_forward_pass, actor_params, opp_forward_pass, opp_params
-            ):
-                return single_play_step_two_policy_commpetitive(
-                    step_fn=step_fn,
-                    actor_forward_pass=actor_forward_pass,
-                    actor_params=actor_params,
-                    opp_forward_pass=actor_forward_pass,
-                    opp_params=actor_params,
-                )
-
-            make_step_fn = self_play_step_fn
-        else:
-            make_step_fn = single_play_step_two_policy_commpetitive
-        opp_forward_pass = make_forward_pass(
-            activation=config["OPP_ACTIVATION"],
-            model_type=config["OPP_MODEL_TYPE"],
-        )
-        opp_params = pickle.load(open(config["OPP_MODEL_PATH"], "rb"))
-    elif config["GAME_MODE"] == "free-run":
-        make_step_fn = single_play_step_free_run
-        opp_forward_pass = None
-        opp_params = None
-
-    def make_reward_scaling(config):
-        if config["REWARD_SCALING"]:
-
-            def reward_scaling(gae):
-                return (gae - gae.mean()) / (gae.std() + 1e-8)
-
-            return reward_scaling
-
-        else:
-
-            def no_scaling(gae):
-                return gae
-
-            return no_scaling
-
-    reward_scaling = make_reward_scaling(config)
-
-    # TRAIN LOOP
-    def _update_step(runner_state):
-        # COLLECT TRAJECTORIES
-
-        # step_fn = _make_step(config["ENV_NAME"], runner_state[0])  # DONE
-        step_fn = make_step_fn(
-            step_fn=auto_reset(env_step_fn, env_init_fn),
-            actor_forward_pass=actor_forward_pass,
-            actor_params=runner_state[0],
-            opp_forward_pass=opp_forward_pass,
-            opp_params=opp_params,
-        )
-        get_fn = _get
-
-        def _env_step(runner_state, unused):
-            (
-                params,
-                opt_state,
-                env_state,
-                last_obs,
-                terminated_count,
-                rng,
-            ) = runner_state  # DONE
-            actor = env_state.current_player
-            logits, value = actor_forward_pass.apply(
-                params,
-                last_obs.astype(jnp.float32),
-            )  # DONE
-            rng, _rng = jax.random.split(rng)
-            mask = env_state.legal_action_mask
-            pi = policy(mask, logits)
-            action = pi.sample(seed=_rng)
-            log_prob = pi.log_prob(action)
-            # STEP ENV
-            rng, _rng = jax.random.split(rng)
-            env_state = step_fn(env_state, action, _rng)
-            terminated_count += jnp.sum(env_state.terminated)
-            transition = Transition(
-                env_state.terminated,
-                action,
-                value,
-                jax.vmap(get_fn)(env_state.rewards / config["REWARD_SCALE"], actor),
-                log_prob,
-                last_obs,
-                mask,
-            )
-            runner_state = (
-                params,
-                opt_state,
-                env_state,
-                env_state.observation,
-                terminated_count,
-                rng,
-            )  # DONE
-            return runner_state, transition
-
-        runner_state, traj_batch = jax.lax.scan(
-            _env_step, runner_state, None, config["NUM_STEPS"]
-        )
-        # print(traj_batch)
-
-        # CALCULATE ADVANTAGE
-        (
-            params,
-            opt_state,
-            env_state,
-            last_obs,
-            terminated_count,
-            rng,
-        ) = runner_state  # DONE
-        _, last_val = actor_forward_pass.apply(
-            params, last_obs.astype(jnp.float32)
-        )  # DONE
-
-        def _calculate_gae(traj_batch, last_val):
-            def _get_advantages(gae_and_next_value, transition):
-                gae, next_value = gae_and_next_value
-                done, value, reward = (
-                    transition.done,
-                    transition.value,
-                    transition.reward,
-                )
-                delta = reward + config["GAMMA"] * next_value * (1 - done) - value
-                gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
-                return (gae, value), gae
-
-            """
-            def scan(f, init, xs, length=None):
-                if xs is None:
-                    xs = [None] * length
-                carry = init
-                ys = []
-                for x in xs:
-                    carry, y = f(carry, x)
-                    ys.append(y)
-                return carry, ys
-
-            _, advantages = scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-            )
-            """
-
-            _, advantages = jax.lax.scan(
-                _get_advantages,
-                (jnp.zeros_like(last_val), last_val),
-                traj_batch,
-                reverse=True,
-                unroll=16,
-            )
-            return advantages, advantages + traj_batch.value
-
-        # print(traj_batch)
-        # print(last_val)
-
-        advantages, targets = _calculate_gae(traj_batch, last_val)
-        # print(advantages)
-        # print(targets)
-
-        # UPDATE NETWORK
-        def _update_epoch(update_state, unused):
-            def _update_minbatch(tup, batch_info):
-                params, opt_state = tup
-                traj_batch, advantages, targets = batch_info
-
-                def _loss_fn(params, traj_batch, gae, targets):
-                    # RERUN NETWORK
-                    logits, value = actor_forward_pass.apply(
-                        params, traj_batch.obs.astype(jnp.float32)
-                    )  # DONE
-                    mask = traj_batch.legal_action_mask
-                    pi = policy(mask, logits)
-                    log_prob = pi.log_prob(traj_batch.action)
-
-                    # CALCULATE VALUE LOSS
-                    value_pred_clipped = traj_batch.value + (
-                        value - traj_batch.value
-                    ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
-                    value_losses = jnp.square(value - targets)
-                    value_losses_clipped = jnp.square(value_pred_clipped - targets)
-                    value_loss = (
-                        0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
-                    )
-
-                    # CALCULATE ACTOR LOSS
-                    logratio = log_prob - traj_batch.log_prob
-                    ratio = jnp.exp(log_prob - traj_batch.log_prob)
-
-                    # gae標準化
-                    gae = reward_scaling(gae)
-                    loss_actor1 = ratio * gae
-                    loss_actor2 = (
-                        jnp.clip(
-                            ratio,
-                            1.0 - config["CLIP_EPS"],
-                            1.0 + config["CLIP_EPS"],
-                        )
-                        * gae
-                    )
-                    loss_actor = -jnp.minimum(loss_actor1, loss_actor2)
-                    loss_actor = loss_actor.mean()
-
-                    illegal_action_masked_logits = logits + jnp.finfo(
-                        np.float64
-                    ).min * (~mask)
-                    illegal_action_masked_pi = distrax.Categorical(
-                        logits=illegal_action_masked_logits
-                    )
-                    entropy = illegal_action_masked_pi.entropy().mean()
-
-                    pi = distrax.Categorical(logits=logits)
-                    illegal_action_probabilities = pi.probs * ~mask
-                    illegal_action_loss = (
-                        jnp.linalg.norm(illegal_action_probabilities, ord=2) / 2
-                    )
-
-                    total_loss = (
-                        loss_actor
-                        + config["VF_COEF"] * value_loss
-                        - config["ENT_COEF"] * entropy
-                        + config["ILLEGAL_ACTION_L2NORM_COEF"] * illegal_action_loss
-                    )
-                    """
-                    total_loss = -config["ENT_COEF"] * entropy
-                    """
-                    approx_kl = ((ratio - 1) - logratio).mean()
-                    clipflacs = jnp.float32(
-                        jnp.abs((ratio - 1.0)) > config["CLIP_EPS"]
-                    ).mean()
-
-                    return total_loss, (
-                        value_loss,
-                        loss_actor,
-                        entropy,
-                        approx_kl,
-                        clipflacs,
-                        illegal_action_loss,
-                    )
-
-                grad_fn = jax.value_and_grad(_loss_fn, has_aux=True)
-                total_loss, grads = grad_fn(
-                    params, traj_batch, advantages, targets
-                )  # DONE
-                updates, opt_state = optimizer.update(grads, opt_state)
-                params = optax.apply_updates(params, updates)  # DONE
-                return (
-                    params,
-                    opt_state,
-                ), total_loss  # DONE
-
-            (
-                params,
-                opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                rng,
-            ) = update_state  # DONE
-            rng, _rng = jax.random.split(rng)
-            batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
-            assert (
-                batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
-            ), "batch size must be equal to number of steps * number of envs"
-            permutation = jax.random.permutation(_rng, batch_size)
-            batch = (traj_batch, advantages, targets)
-            batch = jax.tree_util.tree_map(
-                lambda x: x.reshape((batch_size,) + x.shape[2:]), batch
-            )
-            shuffled_batch = jax.tree_util.tree_map(
-                lambda x: jnp.take(x, permutation, axis=0), batch
-            )
-            minibatches = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])
-                ),
-                shuffled_batch,
-            )
-            (params, opt_state), total_loss = jax.lax.scan(
-                _update_minbatch, (params, opt_state), minibatches
-            )  # DONE
-            update_state = (
-                params,
-                opt_state,
-                traj_batch,
-                advantages,
-                targets,
-                rng,
-            )  # DONE
-            return update_state, total_loss
-
-        update_state = (
-            params,
-            opt_state,
-            traj_batch,
-            advantages,
-            targets,
-            rng,
-        )  # DONE
-        update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
-        )
-        # print(loss_info)
-        params, opt_state, _, _, _, rng = update_state  # DONE
-
-        runner_state = (
-            params,
-            opt_state,
-            env_state,
-            last_obs,
-            terminated_count,
-            rng,
-        )  # DONE
-        return runner_state, loss_info
-
-    return _update_step
-
 
 def _get(x, i):
     return x[i]
-
-
-def _get_zero(x, i):
-    return x[0]
 
 
 def train(config, rng):
@@ -581,26 +179,50 @@ def train(config, rng):
 
     # MAKE EVAL
     rng, eval_rng = jax.random.split(rng)
-    evaluate = make_evaluate(config)
+    simple_evaluate = make_simple_evaluate(config)
+    simple_duplicate_evaluate = make_simple_duplicate_evaluate(config)
     duplicate_evaluate = make_evaluate(config, duplicate=True)
-    jit_evaluate = jax.jit(evaluate)
+    jit_simple_evaluate = jax.jit(simple_evaluate)
+    jit_simple_duplicate_evaluate = jax.jit(simple_duplicate_evaluate)
     jit_diplicate_evaluate = jax.jit(duplicate_evaluate)
     jit_make_evaluate_log = jax.jit(make_evaluate_log)
 
     # INIT UPDATE FUNCTION
-    _update_step = make_update_fn(config, env.step, env.init)  # DONE
-    jitted_update_step = jax.jit(_update_step)
-    jitted_init = jax.jit(jax.vmap(env.init))
+
+    opp_forward_pass = make_forward_pass(
+        activation=config["OPP_ACTIVATION"],
+        model_type=config["OPP_MODEL_TYPE"],
+    )
 
     # INIT ENV
-    compile_sta = time.time()
+    env_list = []
+    init_list = []
+    roll_out_list = []
+    train_dds_results_list = sorted(
+        [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
+    )[: config["HASH_TABLE_NUM"]]
+    for file in train_dds_results_list:
+        env = bb.BridgeBidding(os.path.join(config["DDS_RESULTS_DIR"], file))
+        env_list.append(env)
+        init_list.append(jax.jit(jax.vmap(env.init)))
+        roll_out_list.append(
+            jax.jit(make_roll_out(config, env, actor_forward_pass, opp_forward_pass))
+        )
+    calc_gae = jax.jit(make_calc_gae(config, actor_forward_pass))
+    update_step = jax.jit(
+        make_update_step(config, actor_forward_pass, optimizer=optimizer)
+    )
+
     rng, _rng = jax.random.split(rng)
     reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
-    compile_end = time.time()
+    init = init_list[0]
+    roll_out = roll_out_list[0]
+    env_state = init(reset_rng)
 
-    print(f"compile time: {compile_end - compile_sta}")
-
-    env_state = jitted_init(reset_rng)
+    hash_index_list = np.arange(config["HASH_TABLE_NUM"])
+    steps = 0
+    hash_index = 0
+    board_count = 0
     terminated_count = 0
     rng, _rng = jax.random.split(rng)
     runner_state = (
@@ -612,21 +234,10 @@ def train(config, rng):
         _rng,
     )  # DONE
 
-    anchor_model = None
-    ckpt_filename = f'checkpoints/{config["ENV_NAME"]}/model.ckpt'
-    anchor_filename = f'checkpoints/{config["ENV_NAME"]}/anchor.ckpt'
-    if anchor_filename != "" and os.path.isfile(anchor_filename):
-        with open(ckpt_filename, "rb") as reader:
-            dic = pickle.load(reader)
-        anchor_model = dic["params"]
-
-    steps = 0
-    train_dds_results_list = sorted(
-        [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
-    )
-    hash_index = 0
-    board_count = 0
-
+    if not config["SELF_PLAY"]:
+        opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
+    else:
+        opp_params = params
     if config["SAVE_MODEL"]:
         os.mkdir(
             os.path.join(
@@ -637,40 +248,166 @@ def train(config, rng):
         )
 
     for i in range(config["NUM_UPDATES"]):
+        # save model
+        if (i != 0) and (i % config["SAVE_MODEL_INTERVAL"] == 0):
+            if config["SAVE_MODEL"]:
+                with open(
+                    os.path.join(
+                        config["LOG_PATH"],
+                        config["EXP_NAME"],
+                        config["MODEL_SAVE_PATH"],
+                        f"params-{i:08}.pkl",
+                    ),
+                    "wb",
+                ) as writer:
+                    pickle.dump(runner_state[0], writer)
+                with open(
+                    os.path.join(
+                        config["LOG_PATH"],
+                        config["EXP_NAME"],
+                        config["MODEL_SAVE_PATH"],
+                        f"opt_state-{i:08}.pkl",
+                    ),
+                    "wb",
+                ) as writer:
+                    pickle.dump(runner_state[1], writer)
+
         # eval
         time_eval_sta = time.time()
-        # state, log_info = jit_evaluate(runner_state[0], eval_rng)  # DONE
-        log_info, _, _ = jit_diplicate_evaluate(runner_state[0], eval_rng)
+        R = jit_simple_evaluate(runner_state[0], eval_rng)
         time_eval_end = time.time()
         print(f"eval time: {time_eval_end-time_eval_sta}")
+        if i % config["NUM_EVAL_STEP"] == 0:
+            time_du_sta = time.time()
+            log_info, _, _ = jit_diplicate_evaluate(runner_state[0], eval_rng)
+            eval_log = jit_make_evaluate_log(log_info)
+            time_du_end = time.time()
+            print(f"duplicate eval time: {time_du_end-time_du_sta}")
+
+        if config["SELF_PLAY"]:
+            (imp_opp, _, _), _, _ = jit_simple_duplicate_evaluate(
+                team1_params=runner_state[0],
+                team2_params=opp_params,
+                rng_key=eval_rng,
+            )
+            if imp_opp >= config["MODEL_ZOO_THRESHOLD"]:
+                params_list = sorted(
+                    [
+                        path
+                        for path in os.listdir(
+                            os.path.join(
+                                config["LOG_PATH"],
+                                config["EXP_NAME"],
+                                config["MODEL_SAVE_PATH"],
+                            )
+                        )
+                        if "params" in path
+                    ]
+                )
+                if (len(params_list) != 0) and np.random.binomial(
+                    size=1, n=1, p=config["MODEL_ZOO_RATIO"]
+                ):
+                    if config["PRIORITIZED_FICTITIOUS"]:
+                        league_sta = time.time()
+                        win_rate_list = np.zeros(len(params_list))
+                        imp_list = np.zeros(len(params_list))
+                        team1_params = runner_state[0]
+                        for i in range(len(params_list)):
+                            team2_params = pickle.load(
+                                open(
+                                    os.path.join(
+                                        config["LOG_PATH"],
+                                        config["EXP_NAME"],
+                                        config["MODEL_SAVE_PATH"],
+                                        params_list[i],
+                                    ),
+                                    "rb",
+                                )
+                            )
+                            log, _, _ = jit_simple_duplicate_evaluate(
+                                team1_params=team1_params,
+                                team2_params=team2_params,
+                                rng_key=eval_rng,
+                            )
+                            print(log)
+                            win_rate_list[i] = log[2]
+                            imp_list[i] = log[0]
+                        league_end = time.time()
+                        print(f"league time: {league_end - league_sta}")
+                        print(win_rate_list)
+                        squared_diff = (1 - win_rate_list) ** 2
+                        probabilities = squared_diff / np.sum(squared_diff)
+                        print(squared_diff)
+                        print(probabilities)
+
+                        def softmax(x):
+                            # 入力配列の最後の次元で指数関数を計算します（axis=-1は最後の次元を表します）
+                            exp_values = np.exp(
+                                (x - np.max(x, axis=-1, keepdims=True))
+                                / config["PRIOR_T"]
+                            )  # 数値安定性のために最大値を引きます
+                            probabilities = exp_values / np.sum(
+                                exp_values, axis=-1, keepdims=True
+                            )
+                            return probabilities
+
+                        probabilities = softmax(-imp_list)
+                        print(probabilities)
+                        params_index = np.random.choice(
+                            len(probabilities), p=probabilities
+                        )
+                        print(params_index)
+                        params_path = params_list[params_index]
+                    else:
+                        params_path = np.random.choice(params_list)
+                    print(f"opposite params: {params_path}")
+                    opp_params = pickle.load(
+                        open(
+                            os.path.join(
+                                config["LOG_PATH"],
+                                config["EXP_NAME"],
+                                config["MODEL_SAVE_PATH"],
+                                params_path,
+                            ),
+                            "rb",
+                        )
+                    )
+                else:
+                    print("opposite params: latest")
+                    opp_params = runner_state[0]
+            else:
+                print("opposite params: latest")
+                opp_params = opp_params
+        (imp_opp_before, _, _), _, _ = jit_simple_duplicate_evaluate(
+            team1_params=runner_state[0],
+            team2_params=opp_params,
+            rng_key=eval_rng,
+        )
         time1 = time.time()
-        runner_state, loss_info = jitted_update_step(runner_state)  # DONE
-        # runner_state, loss_info = _update_step(runner_state)
+        runner_state, traj_batch = roll_out(
+            runner_state=runner_state, opp_params=opp_params
+        )
         time2 = time.time()
-        print(f"update time: {time2 - time1}")
+        advantages, targets = calc_gae(runner_state=runner_state, traj_batch=traj_batch)
+        time3 = time.time()
+        runner_state, loss_info = update_step(
+            runner_state=runner_state,
+            traj_batch=traj_batch,
+            advantages=advantages,
+            targets=targets,
+        )
+        time4 = time.time()
+        (imp_opp_after, _, _), _, _ = jit_simple_duplicate_evaluate(
+            team1_params=runner_state[0],
+            team2_params=opp_params,
+            rng_key=eval_rng,
+        )
+
+        print(f"rollout time: {time2 - time1}")
+        print(f"calc gae time: {time3 - time2}")
+        print(f"update time: {time4 - time3}")
         steps += config["NUM_ENVS"] * config["NUM_STEPS"]
 
-        if config["SAVE_MODEL"]:
-            with open(
-                os.path.join(
-                    config["LOG_PATH"],
-                    config["EXP_NAME"],
-                    config["MODEL_SAVE_PATH"],
-                    f"params-{i:08}.pkl",
-                ),
-                "wb",
-            ) as writer:
-                pickle.dump(runner_state[0], writer)
-            with open(
-                os.path.join(
-                    config["LOG_PATH"],
-                    config["EXP_NAME"],
-                    config["MODEL_SAVE_PATH"],
-                    f"opt_state-{i:08}.pkl",
-                ),
-                "wb",
-            ) as writer:
-                pickle.dump(runner_state[1], writer)
         total_loss, (
             value_loss,
             loss_actor,
@@ -679,25 +416,10 @@ def train(config, rng):
             clipflacs,
             illegal_action_loss,
         ) = loss_info
-        time_make_log_sta = time.time()
-        eval_log = jit_make_evaluate_log(log_info)
-        time_make_log_end = time.time()
-        print(f"make log time: {time_make_log_end -time_make_log_sta}")
-        """
-        print(value_loss)
-        print(value_loss.shape)
-        print(loss_actor)
-        print(loss_actor.shape)
-        print(entropy)
-        print(entropy.shape)
-        print(approx_kl)
-        print(approx_kl.shape)
-        print(clipflacs)
-        print(clipflacs.shape)
-        """
 
         # make log
         log = {
+            "train/score": float(R),
             "train/total_loss": float(total_loss[-1][-1]),
             "train/value_loss": float(value_loss[-1][-1]),
             "train/loss_actor": float(loss_actor[-1][-1]),
@@ -705,35 +427,38 @@ def train(config, rng):
             "train/policy_entropy": float(entropy[-1][-1]),
             "train/clipflacs": float(clipflacs[-1][-1]),
             "train/approx_kl": float(approx_kl[-1][-1]),
+            "train/lr": float(
+                linear_schedule(
+                    (i + 1) * config["UPDATE_EPOCHS"] * config["NUM_MINIBATCHES"]
+                )
+            ),
+            "train/imp_opp_before": float(imp_opp_before),
+            "train/imp_opp_after": float(imp_opp_after),
             "board_num": int(runner_state[4]),
             "steps": steps,
         }
-        total_log = {**log, **eval_log}
         pprint(log)
+        if i % config["NUM_EVAL_STEP"] == 0:
+            log = {**log, **eval_log}
         if config["TRACK"]:
-            wandb.log(total_log)
+            wandb.log(log)
         if (runner_state[4] - board_count) // config["HASH_SIZE"] >= 1:
             hash_index += 1
             print(f"board count: {runner_state[4] - board_count}")
             board_count = runner_state[4]
-            if hash_index == len(train_dds_results_list):
+            if hash_index == len(hash_index_list):
                 hash_index = 0
-                random.shuffle(train_dds_results_list)
-            hash_path = os.path.join(
-                config["DDS_RESULTS_DIR"], train_dds_results_list[hash_index]
+                print("use all hash, shuffle")
+                np.random.shuffle(hash_index_list)
+            print(
+                f"use hash table: {train_dds_results_list[hash_index_list[hash_index]]}"
             )
-            reload_sta = time.time()
-            env = bb.BridgeBidding(hash_path)
-            _update_step = make_update_fn(config, env.step, env.init)  # DONE
-            jitted_init = jax.jit(jax.vmap(env.init))
-            jitted_update_step = jax.jit(_update_step)
-
+            init = init_list[hash_index_list[hash_index]]
+            roll_out = roll_out_list[hash_index_list[hash_index]]
             rng, _rng = jax.random.split(rng)
             reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
 
-            env_state = jitted_init(reset_rng)
-            reload_end = time.time()
-            print(f"reload time: {reload_end - reload_sta}")
+            env_state = init(reset_rng)
             runner_state = (
                 runner_state[0],
                 runner_state[1],
@@ -742,6 +467,27 @@ def train(config, rng):
                 runner_state[4],
                 _rng,
             )
+    if config["SAVE_MODEL"]:
+        with open(
+            os.path.join(
+                config["LOG_PATH"],
+                config["EXP_NAME"],
+                config["MODEL_SAVE_PATH"],
+                f"params-{i + 1:08}.pkl",
+            ),
+            "wb",
+        ) as writer:
+            pickle.dump(runner_state[0], writer)
+        with open(
+            os.path.join(
+                config["LOG_PATH"],
+                config["EXP_NAME"],
+                config["MODEL_SAVE_PATH"],
+                f"opt_state-{i + 1:08}.pkl",
+            ),
+            "wb",
+        ) as writer:
+            pickle.dump(runner_state[1], writer)
 
     return runner_state
 
@@ -764,9 +510,6 @@ if __name__ == "__main__":
         # "ACTIVATION": args.ACTIVATION,
         "ENV_NAME": args.ENV_NAME,
         "ANNEAL_LR": True,
-        "VS_RANDOM": args.VS_RANDOM,
-        "UPDATE_INTERVAL": args.UPDATE_INTERVAL,
-        "MAKE_ANCHOR": args.MAKE_ANCHOR,
         "NUM_EVAL_ENVS": args.NUM_EVAL_ENVS,
         "DDS_RESULTS_DIR": args.DDS_RESULTS_DIR,
         "HASH_SIZE": args.HASH_SIZE,
@@ -780,6 +523,7 @@ if __name__ == "__main__":
         "LOAD_INITIAL_MODEL": args.LOAD_INITIAL_MODEL,
         "INITIAL_MODEL_PATH": args.INITIAL_MODEL_PATH,
         "SAVE_MODEL": args.SAVE_MODEL,
+        "SAVE_MODEL_INTERVAL": args.SAVE_MODEL_INTERVAL,
         "MODEL_SAVE_PATH": args.MODEL_SAVE_PATH,
         "LOG_PATH": args.LOG_PATH,
         "EXP_NAME": args.EXP_NAME,
@@ -791,15 +535,24 @@ if __name__ == "__main__":
         "REWARD_SCALING": args.REWARD_SCALING,
         "SEED": args.SEED,
         "SELF_PLAY": args.SELF_PLAY,
-        "MODEL_ZOO": args.MODEL_ZOO
+        "MODEL_ZOO_RATIO": args.MODEL_ZOO_RATIO,
+        "MODEL_ZOO_THRESHOLD": args.MODEL_ZOO_THRESHOLD,
+        "PRIORITIZED_FICTITIOUS": args.PRIORITIZED_FICTITIOUS,
+        "PRIOR_T": args.PRIOR_T,
+        "NUM_PRIORITIZED_ENVS": args.NUM_PRIORITIZED_ENVS,
+        # "MODEL_ZOO": args.MODEL_ZOO,
+        "MODEL_ZOO_NUM": args.MODEL_ZOO_NUM,
+        "EVAL_OPP_ACTIVATION": args.EVAL_OPP_ACTIVATION,
+        "EVAL_OPP_MODEL_TYPE": args.EVAL_OPP_MODEL_TYPE,
+        "EVAL_OPP_MODEL_PATH": args.EVAL_OPP_MODEL_PATH,
+        "HASH_TABLE_NUM": args.HASH_TABLE_NUM,
+        "NUM_EVAL_STEP": args.NUM_EVAL_STEP,
+        "VALUE_CLIPPING": args.VALUE_CLIPPING,
+        "GLOBAL_GRADIENT_CLIPPING": args.GLOBAL_GRADIENT_CLIPPING,
     }
     if args.TRACK:
-        key = (
-            "ffda4b38a6fd57db59331dd7ba8c7e316b179dd9"  # please specify your wandb key
-        )
-        wandb.login(key=key)
         wandb.init(
-            project=f"ppo-bridge",
+            project="ppo-bridge",
             name=args.EXP_NAME,
             config=args.dict(),
             save_code=True,

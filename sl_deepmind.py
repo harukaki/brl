@@ -33,7 +33,7 @@ import optax
 
 import pyspiel
 import wandb
-from src.models import ActorCritic
+from src.models import ActorCritic, ActorNN
 import distrax
 
 OptState = Any
@@ -56,8 +56,11 @@ flags.DEFINE_integer("eval_batch", 10000, "Batch size when evaluating")
 flags.DEFINE_integer("rng_seed", 42, "Seed for initial network weights")
 flags.DEFINE_string("save_path", None, "Location for saved networks")
 flags.DEFINE_float("learning_rate", 1e-4, "Learning rate for optimizer")
-flags.DEFINE_float("entropy_coef", 0.1, "coef for entropy term")
-flags.DEFINE_string("model_type", "DeepMind", "model type of NN, DeepMind or FAIR")
+flags.DEFINE_float("entropy_coef", 0, "coef for entropy term")
+flags.DEFINE_string(
+    "model_type", "FAIR_6", "model type of NN, DeepMind or FAIR, FAIR_6"
+)
+flags.DEFINE_boolean("only_actor", False, "only actor")
 
 
 def _no_play_trajectory(line: str):
@@ -147,22 +150,30 @@ def net_fn(x):
 
 
 def actor_critic_net_fn(x):
-    net = ActorCritic(action_dim=38, activation="relu", model=FLAGS.model_type)
-    logits, value = net(x)
+    if FLAGS.only_actor:
+        net = ActorNN(action_dim=38, activation="relu")
+        logits = net(x)
+    else:
+        net = ActorCritic(action_dim=38, activation="relu", model=FLAGS.model_type)
+        logits, value = net(x)
     return logits
 
 
 def main(argv):
-    wandb.login()
     wandb.init(
         project="wbride5_learning",
         config={
             "ITERATIONS": FLAGS.iterations,
             "TRAIN_BATCH": FLAGS.train_batch,
             "lr": FLAGS.learning_rate,
+            "model_type": FLAGS.model_type,
+            "entropy_coef": FLAGS.entropy_coef,
+            "only actor NN": FLAGS.only_actor,
         },
     )
+
     config = wandb.config
+    print(config)
 
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
