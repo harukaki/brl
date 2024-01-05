@@ -54,9 +54,7 @@ class PPOConfig(BaseModel):
     # eval config
     NUM_EVAL_ENVS: int = 10000
     EVAL_OPP_ACTIVATION: str = "relu"
-    EVAL_OPP_MODEL_TYPE: Literal[
-        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
-    ] = "DeepMind"
+    EVAL_OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
     EVAL_OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
     NUM_EVAL_STEP: int = 10
     # log config
@@ -71,16 +69,12 @@ class PPOConfig(BaseModel):
     LOAD_INITIAL_MODEL: bool = False
     INITIAL_MODEL_PATH: str = "sl_log/sl_deepmind_actor_critic/params-400000.pkl"
     ACTOR_ACTIVATION: str = "relu"
-    ACTOR_MODEL_TYPE: Literal[
-        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
-    ] = "DeepMind"
+    ACTOR_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
     # opposite config
     GAME_MODE: Literal["competitive", "free-run"] = "competitive"
     SELF_PLAY: bool = True
     OPP_ACTIVATION: str = "relu"
-    OPP_MODEL_TYPE: Literal[
-        "DeepMind", "FAIR", "FAIR_6", "DeepMind_6", "DeepMind_8"
-    ] = "DeepMind"
+    OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
     OPP_MODEL_PATH: str = None
     MODEL_ZOO_RATIO: float = 0
     MODEL_ZOO_NUM: int = 50_000
