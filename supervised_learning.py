@@ -1,16 +1,8 @@
-# Copyright 2019 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+"""This code is modified from OpenSpiel:
+
+  https://github.com/google-deepmind/open_spiel
+
+Please refer to their work if you use this example in your research."""
 
 """Train a policy net on bridge bidding based on a dataset of trajectories.
 
@@ -47,8 +39,8 @@ NUM_CARDS = 52
 NUM_PLAYERS = 4
 TOP_K_ACTIONS = 5  # How many alternative actions to display
 
-flags.DEFINE_integer("iterations", 500000, "Number of iterations")
-flags.DEFINE_string("data_path", "dataset/openspiel-data", "Location for data")
+flags.DEFINE_integer("iterations", 400000, "Number of iterations")
+flags.DEFINE_string("data_path", None, "Location for data")
 flags.DEFINE_integer("eval_every", 10000, "How often to evaluate the policy")
 flags.DEFINE_integer("num_examples", 3, "How many examples to print per evaluation")
 flags.DEFINE_integer("train_batch", 128, "Batch size for training step")
@@ -57,10 +49,8 @@ flags.DEFINE_integer("rng_seed", 42, "Seed for initial network weights")
 flags.DEFINE_string("save_path", None, "Location for saved networks")
 flags.DEFINE_float("learning_rate", 1e-4, "Learning rate for optimizer")
 flags.DEFINE_float("entropy_coef", 0, "coef for entropy term")
-flags.DEFINE_string(
-    "model_type", "FAIR_6", "model type of NN, DeepMind or FAIR, FAIR_6"
-)
-flags.DEFINE_boolean("only_actor", False, "only actor")
+flags.DEFINE_string("model_type", "DeepMind", "model type of NN, DeepMind or FAIR")
+flags.DEFINE_string("activation", "relu", "activation for NN")
 
 
 def _no_play_trajectory(line: str):
@@ -98,7 +88,6 @@ def make_dataset(file: str):
 
 def batch(dataset, batch_size: int):
     """Creates a batched dataset from a one-at-a-time dataset."""
-    # observations = np.zeros([batch_size] + GAME.observation_tensor_shape(), np.float32)
     observations = np.zeros([batch_size] + [480], np.float32)
     labels = np.zeros(batch_size, dtype=np.int32)
     legal_actions = np.zeros([batch_size] + [38], dtype=np.bool_)
@@ -118,12 +107,10 @@ def one_hot(x, k):
 
 
 def actor_critic_net_fn(x):
-    if FLAGS.only_actor:
-        net = ActorNN(action_dim=38, activation="relu")
-        logits = net(x)
-    else:
-        net = ActorCritic(action_dim=38, activation="relu", model=FLAGS.model_type)
-        logits, value = net(x)
+    net = ActorCritic(
+        action_dim=38, activation=FLAGS.activation, model=FLAGS.model_type
+    )
+    logits, value = net(x)
     return logits
 
 
@@ -135,19 +122,16 @@ def main(argv):
             "TRAIN_BATCH": FLAGS.train_batch,
             "lr": FLAGS.learning_rate,
             "model_type": FLAGS.model_type,
+            "activation": FLAGS.activation,
             "entropy_coef": FLAGS.entropy_coef,
-            "only actor NN": FLAGS.only_actor,
         },
     )
-
     config = wandb.config
     print(config)
-
     if len(argv) > 1:
         raise app.UsageError("Too many command-line arguments.")
 
     # Make the network.
-    # net = hk.without_apply_rng(hk.transform(net_fn))
     net = hk.without_apply_rng(hk.transform(actor_critic_net_fn))
     # Make the optimiser.
     opt = optax.adam(FLAGS.learning_rate)
@@ -161,15 +145,12 @@ def main(argv):
     ):
         """Cross-entropy loss."""
         assert targets.dtype == np.int32
-        # log_probs = net.apply(params, inputs)
         logits = net.apply(params, inputs)
         log_probs = jax.nn.log_softmax(logits)
         target_loss = -jnp.mean(one_hot(targets, NUM_ACTIONS) * log_probs)
         masked_logits = logits + jnp.finfo(np.float64).min * (~legal_actions)
         masked_pi = distrax.Categorical(masked_logits)
         entropy = masked_pi.entropy().mean()
-        # pi = distrax.Categorical(logits)
-        # entropy = pi.entropy().mean()
         total_loss = target_loss - FLAGS.entropy_coef * entropy
         return total_loss, (target_loss, entropy)
 
@@ -180,7 +161,6 @@ def main(argv):
         targets: np.ndarray,
     ) -> jax.Array:
         """Classification accuracy."""
-        # predictions = net.apply(params, inputs)
         predictions = jax.nn.softmax(net.apply(params, inputs))
         return jnp.mean(jnp.argmax(predictions, axis=-1) == targets)
 
@@ -288,7 +268,7 @@ def main(argv):
                 "test/test_accuracy": test_accuracy,
                 "test/illegal_actions_prob": illegal_action_prob.mean(),
             }
-            if FLAGS.save_path:
+            if FLAGS.save_path is not None:
                 filename = os.path.join(FLAGS.save_path, f"params-{1 + step}.pkl")
                 with open(filename, "wb") as pkl_file:
                     pickle.dump(params, pkl_file)

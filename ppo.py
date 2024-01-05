@@ -1,6 +1,8 @@
-"""
-This code is based on https://github.com/luchris429/purejaxrl
-"""
+"""This code is modified from PureJaxRL:
+
+  https://github.com/luchris429/purejaxrl
+
+Please refer to their work if you use this example in your research."""
 import jax
 import jax.numpy as jnp
 import numpy as np
