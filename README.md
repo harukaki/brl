@@ -8,7 +8,7 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 
 run supervised learning
 ```bash
-python sl_deepmind.py --data_path DATA_PATH [--save_path SAVE_PATH]
+python supervised_learning.py --data_path DATA_PATH [--save_path SAVE_PATH]
 ```
 
 Arguments
@@ -18,9 +18,14 @@ Arguments
 ```
 ### Reinforcement Learning
 ```bash
-python new_ppo.py
+python ppo.py
 ```
 ```example
-python new_ppo.py NUM_ENVS=10 NUM_STEPS=5 TOTAL_TIMESTEPS=1000 UPDATE_EPOCHS=2 MINIBATCH_SIZE=10 NUM_EVAL_ENVS=10 TRACK=False
+python ppo.py NUM_ENVS=10 NUM_STEPS=5 TOTAL_TIMESTEPS=1000 UPDATE_EPOCHS=2 \
+ MINIBATCH_SIZE=10 NUM_EVAL_ENVS=10 TRACK=False
 ```
-
+Arguments
+```bash
+--data path    Path to the directory where the training dataset is located
+--save_path    Path to the directory where the trained model will be saved
+```
