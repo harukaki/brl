@@ -14,7 +14,8 @@ python sl_deepmind.py [--data_path DATA_PATH] [--save_path SAVE_PATH]
 Optional arguments
 ```bash
 --data path    Path to the directory where the training dataset is located
---save_path    Path to the directory where the trained model will be saved.
+--save_path    Path to the directory where the trained model will be saved
+```
 ### Reinforcement Learning
 ```bash
 python new_ppo.py
