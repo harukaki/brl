@@ -35,7 +35,6 @@ print(jax.local_devices())
 
 
 class PPOConfig(BaseModel):
-    ENV_NAME: Literal["bridge_bidding"] = "bridge_bidding"
     SEED: int = 0
     LR: float = 0.000001  # 0.0003
     NUM_ENVS: int = 8192
@@ -59,15 +58,15 @@ class PPOConfig(BaseModel):
     EVAL_OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
     NUM_EVAL_STEP: int = 10
     # log config
-    SAVE_MODEL: bool = True
+    SAVE_MODEL: bool = False
     SAVE_MODEL_INTERVAL: int = 1
     LOG_PATH: str = "rl_log"
     EXP_NAME: str = "exp_0000"
     MODEL_SAVE_PATH: str = "rl_params"
-    TRACK: bool = True
+    TRACK: bool = False
 
     # actor config
-    LOAD_INITIAL_MODEL: bool = True
+    LOAD_INITIAL_MODEL: bool = False
     INITIAL_MODEL_PATH: str = "sl_log/sl_deepmind_actor_critic/params-400000.pkl"
     ACTOR_ACTIVATION: str = "relu"
     ACTOR_MODEL_TYPE: Literal[
@@ -201,6 +200,8 @@ def train(config, rng):
     train_dds_results_list = sorted(
         [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
     )[: config["HASH_TABLE_NUM"]]
+
+    # dds_resultsの異なるhash tableをloadしたenvを用意
     for file in train_dds_results_list:
         env = bb.BridgeBidding(os.path.join(config["DDS_RESULTS_DIR"], file))
         env_list.append(env)
@@ -329,34 +330,25 @@ def train(config, rng):
                                 team2_params=team2_params,
                                 rng_key=eval_rng,
                             )
-                            print(log)
                             win_rate_list[i] = log[2]
                             imp_list[i] = log[0]
                         league_end = time.time()
                         print(f"league time: {league_end - league_sta}")
-                        print(win_rate_list)
-                        squared_diff = (1 - win_rate_list) ** 2
-                        probabilities = squared_diff / np.sum(squared_diff)
-                        print(squared_diff)
-                        print(probabilities)
 
                         def softmax(x):
-                            # 入力配列の最後の次元で指数関数を計算します（axis=-1は最後の次元を表します）
                             exp_values = np.exp(
                                 (x - np.max(x, axis=-1, keepdims=True))
                                 / config["PRIOR_T"]
-                            )  # 数値安定性のために最大値を引きます
+                            )  # 数値安定性のために最大値を引く
                             probabilities = exp_values / np.sum(
                                 exp_values, axis=-1, keepdims=True
                             )
                             return probabilities
 
                         probabilities = softmax(-imp_list)
-                        print(probabilities)
                         params_index = np.random.choice(
                             len(probabilities), p=probabilities
                         )
-                        print(params_index)
                         params_path = params_list[params_index]
                     else:
                         params_path = np.random.choice(params_list)
@@ -507,8 +499,6 @@ if __name__ == "__main__":
         "ENT_COEF": args.ENT_COEF,
         "VF_COEF": args.VF_COEF,
         "MAX_GRAD_NORM": args.MAX_GRAD_NORM,
-        # "ACTIVATION": args.ACTIVATION,
-        "ENV_NAME": args.ENV_NAME,
         "ANNEAL_LR": True,
         "NUM_EVAL_ENVS": args.NUM_EVAL_ENVS,
         "DDS_RESULTS_DIR": args.DDS_RESULTS_DIR,
@@ -519,7 +509,6 @@ if __name__ == "__main__":
         "OPP_ACTIVATION": args.OPP_ACTIVATION,
         "OPP_MODEL_TYPE": args.OPP_MODEL_TYPE,
         "OPP_MODEL_PATH": args.OPP_MODEL_PATH,
-        "NUM_EVAL_ENVS": args.NUM_EVAL_ENVS,
         "LOAD_INITIAL_MODEL": args.LOAD_INITIAL_MODEL,
         "INITIAL_MODEL_PATH": args.INITIAL_MODEL_PATH,
         "SAVE_MODEL": args.SAVE_MODEL,
@@ -540,7 +529,6 @@ if __name__ == "__main__":
         "PRIORITIZED_FICTITIOUS": args.PRIORITIZED_FICTITIOUS,
         "PRIOR_T": args.PRIOR_T,
         "NUM_PRIORITIZED_ENVS": args.NUM_PRIORITIZED_ENVS,
-        # "MODEL_ZOO": args.MODEL_ZOO,
         "MODEL_ZOO_NUM": args.MODEL_ZOO_NUM,
         "EVAL_OPP_ACTIVATION": args.EVAL_OPP_ACTIVATION,
         "EVAL_OPP_MODEL_TYPE": args.EVAL_OPP_MODEL_TYPE,
@@ -570,7 +558,6 @@ if __name__ == "__main__":
         )
         config_file.close()
     pprint(config)
-    print("training of", config["ENV_NAME"])
     rng = jax.random.PRNGKey(config["SEED"])
     sta = time.time()
     out = train(config, rng)

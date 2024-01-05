@@ -67,9 +67,7 @@ def _imp_reward(
         body_fun,
         (0, abs(table_a_reward[0] + table_b_reward[0])),
     )
-    return jnp.array(
-        [imp * win, imp * win, -imp * win, -imp * win], dtype=jnp.float32
-    )
+    return jnp.array([imp * win, imp * win, -imp * win, -imp * win], dtype=jnp.float32)
 
 
 def _duplicate_init(
@@ -157,21 +155,15 @@ def duplicate_step(step_fn):
         )
 
         next_state = jax.lax.cond(
-            table_a_info.terminated
-            & state.terminated
-            & ~table_b_info.terminated,
+            table_a_info.terminated & state.terminated & ~table_b_info.terminated,
             lambda: state.replace(  # type: ignore
                 rewards=_imp_reward(table_a_info.rewards, state.rewards)
             ),
-            lambda: next_state.replace(
-                rewards=jnp.zeros(4, dtype=jnp.float32)
-            ),
+            lambda: next_state.replace(rewards=jnp.zeros(4, dtype=jnp.float32)),
         )
 
         table_b_info = jax.lax.cond(
-            state.terminated
-            & table_a_info.terminated
-            & ~table_b_info.terminated,
+            state.terminated & table_a_info.terminated & ~table_b_info.terminated,
             lambda: Table_info(
                 terminated=state.terminated,
                 rewards=state.rewards,
@@ -196,51 +188,6 @@ def duplicate_step(step_fn):
         )
 
         return next_state, table_a_info, table_b_info
-        """
-        return jax.lax.cond(
-            ~state.terminated,
-            lambda: (
-                state,
-                table_a_info,
-                table_b_info,
-            ),
-            lambda: jax.lax.cond(
-                table_a_info.terminated,
-                lambda: jax.lax.cond(
-                    ~table_b_info.terminated,
-                    lambda: (
-                        state.replace(  # type: ignore
-                            rewards=_imp_reward(
-                                table_a_info.rewards, state.rewards
-                            )
-                        ),
-                        table_a_info,
-                        Table_info(
-                            terminated=state.terminated,
-                            rewards=state.rewards,
-                            last_bid=state._last_bid,
-                            last_bidder=state._last_bidder,
-                            call_x=state._call_x,
-                            call_xx=state._call_xx,
-                        ),
-                    ),
-                    lambda: (state, table_a_info, table_b_info),
-                ),
-                lambda: (
-                    duplicate_init(state),
-                    Table_info(
-                        terminated=state.terminated,
-                        rewards=state.rewards,
-                        last_bid=state._last_bid,
-                        last_bidder=state._last_bidder,
-                        call_x=state._call_x,
-                        call_xx=state._call_xx,
-                    ),
-                    table_b_info,
-                ),
-            ),
-        )
-        """
 
     return wrapped_step
 
@@ -290,9 +237,7 @@ if __name__ == "__main__":
         print(f"{i:04d}")
         print("================")
         print(f"curr_player: {state.current_player}\naction: {action}")
-        print(
-            f"curr_player_position: {player_position(state.current_player, state)}"
-        )
+        print(f"curr_player_position: {player_position(state.current_player, state)}")
         print(f"shuflled_players:\n{state._shuffled_players}")
         state.save_svg(f"svg/{i:04d}.svg")
         state_check = env.step(state, action)

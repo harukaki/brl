@@ -20,7 +20,7 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 
 import os
 import pickle
-from typing import Any, Tuple
+from typing import Any
 
 from absl import app
 from absl import flags
@@ -47,7 +47,7 @@ NUM_CARDS = 52
 NUM_PLAYERS = 4
 TOP_K_ACTIONS = 5  # How many alternative actions to display
 
-flags.DEFINE_integer("iterations", 400000, "Number of iterations")
+flags.DEFINE_integer("iterations", 500000, "Number of iterations")
 flags.DEFINE_string("data_path", "dataset/openspiel-data", "Location for data")
 flags.DEFINE_integer("eval_every", 10000, "How often to evaluate the policy")
 flags.DEFINE_integer("num_examples", 3, "How many examples to print per evaluation")
@@ -86,19 +86,6 @@ def make_dataset(file: str):
             state = GAME.new_initial_state()
             for action in trajectory[:action_index]:
                 state.apply_action(action)
-            """
-            print("state")
-            print(state)
-            print("observe")
-            print(state.observation_tensor())
-            print(len(state.observation_tensor()))
-            print("action_index")
-            print(action_index)
-            print("trajectory action_index")
-            print(trajectory[action_index])
-            print("target")
-            print(trajectory[action_index] - MIN_ACTION)
-            """
             legal_actions = state.legal_actions()
             legal_actions_tensor = np.zeros(38)
             legal_actions_tensor[np.array(legal_actions) - 52] = 1
@@ -114,7 +101,7 @@ def batch(dataset, batch_size: int):
     # observations = np.zeros([batch_size] + GAME.observation_tensor_shape(), np.float32)
     observations = np.zeros([batch_size] + [480], np.float32)
     labels = np.zeros(batch_size, dtype=np.int32)
-    legal_actions = np.zeros([batch_size] + [38], dtype=np.bool8)
+    legal_actions = np.zeros([batch_size] + [38], dtype=np.bool_)
     while True:
         for batch_index in range(batch_size):
             (
@@ -128,25 +115,6 @@ def batch(dataset, batch_size: int):
 def one_hot(x, k):
     """Returns a one-hot encoding of `x` of size `k`."""
     return jnp.array(x[..., jnp.newaxis] == jnp.arange(k), dtype=np.float32)
-
-
-def net_fn(x):
-    """Haiku module for our network."""
-    net = hk.Sequential(
-        [
-            hk.Linear(1024),
-            jax.nn.relu,
-            hk.Linear(1024),
-            jax.nn.relu,
-            hk.Linear(1024),
-            jax.nn.relu,
-            hk.Linear(1024),
-            jax.nn.relu,
-            hk.Linear(NUM_ACTIONS),
-            jax.nn.log_softmax,
-        ]
-    )
-    return net(x)
 
 
 def actor_critic_net_fn(x):
