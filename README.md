@@ -8,10 +8,10 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 
 run supervised learning
 ```bash
-python sl_deepmind.py [--data_path DATA_PATH] [--save_path SAVE_PATH]
+python sl_deepmind.py --data_path DATA_PATH [--save_path SAVE_PATH]
 ```
 
-Optional arguments
+Arguments
 ```bash
 --data path    Path to the directory where the training dataset is located
 --save_path    Path to the directory where the trained model will be saved
