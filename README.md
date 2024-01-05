@@ -26,6 +26,11 @@ python ppo.py NUM_ENVS=10 NUM_STEPS=5 TOTAL_TIMESTEPS=1000 UPDATE_EPOCHS=2 \
 ```
 Arguments
 ```bash
---data path    Path to the directory where the training dataset is located
---save_path    Path to the directory where the trained model will be saved
+NUM_ENVS    
+NUM_STEPS
+TOTAL_TIMESTEPS
+UPDATE_EPOCHS
+MINIBATCH_SIZE
+NUM_EVAL_ENVS
+TRACK
 ```
