@@ -21,7 +21,7 @@ import optax
 
 import pyspiel
 import wandb
-from src.models import ActorCritic, ActorNN
+from src.models import ActorCritic
 import distrax
 from omegaconf import OmegaConf
 from pydantic import BaseModel
