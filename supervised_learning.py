@@ -265,8 +265,6 @@ def main():
             test_loss = loss(params, inputs, targets, legal_actions)
             total_loss, (target_loss, entropy) = test_loss
             pi = jax.nn.softmax(net.apply(params, inputs))
-            print(pi)
-            print(legal_actions)
             illegal_action_prob = jax.vmap(jnp.dot)(pi, ~legal_actions)
             print(f"After {1+step} steps, test accuracy: {test_accuracy}.")
             test_metrics = {
