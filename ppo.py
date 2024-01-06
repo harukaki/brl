@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import numpy as np
 import optax
 from typing import NamedTuple, Literal
-import pgx.bridge_bidding as bb
+from pgx.bridge_bidding import BridgeBidding, download_dds_results
 import time
 import os
 import json
@@ -105,6 +105,9 @@ class PPOConfig(BaseModel):
     ILLEGAL_ACTION_L2NORM_COEF: float = 0
 
 
+args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
+
+
 def linear_schedule(count):
     frac = (
         1.0
@@ -114,7 +117,6 @@ def linear_schedule(count):
     return config["LR"] * frac
 
 
-args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 if args.ANNEAL_LR:
     if args.GLOBAL_GRADIENT_CLIPPING:
         optimizer = optax.chain(
@@ -155,7 +157,9 @@ def train(config, rng):
     config["NUM_MINIBATCHES"] = (
         config["NUM_ENVS"] * config["NUM_STEPS"] // config["MINIBATCH_SIZE"]
     )
-    env = bb.BridgeBidding()
+    if not os.path.isdir("dds_results"):
+        download_dds_results()
+    env = BridgeBidding()
 
     actor_forward_pass = make_forward_pass(
         activation=config["ACTOR_ACTIVATION"],
@@ -199,7 +203,7 @@ def train(config, rng):
 
     # dds_resultsの異なるhash tableをloadしたenvを用意
     for file in train_dds_results_list:
-        env = bb.BridgeBidding(os.path.join(config["DDS_RESULTS_DIR"], file))
+        env = BridgeBidding(os.path.join(config["DDS_RESULTS_DIR"], file))
         env_list.append(env)
         init_list.append(jax.jit(jax.vmap(env.init)))
         roll_out_list.append(
@@ -481,7 +485,6 @@ def train(config, rng):
 
 
 if __name__ == "__main__":
-    # mode = "make-anchor" if args.MAKE_ANCHOR else "train"
     config = {
         "LR": args.LR,
         "NUM_ENVS": args.NUM_ENVS,

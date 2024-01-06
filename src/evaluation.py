@@ -5,7 +5,7 @@ import optax
 from typing import Sequence, NamedTuple, Any, Literal, Type
 import distrax
 import os
-import pgx.bridge_bidding as bb
+from pgx.bridge_bidding import BridgeBidding
 import pickle
 import wandb
 from src.duplicate import duplicate_step, Table_info
@@ -15,8 +15,8 @@ from pprint import pprint
 
 
 def make_simple_evaluate(config):
-    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
-    # eval_env = bb.BridgeBidding("workspace/100_hash.npy")
+    eval_env = BridgeBidding("dds_results/test_000.npy")
+    # eval_env = BridgeBidding("workspace/100_hash.npy")
     actor_forward_pass = make_forward_pass(
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
@@ -67,7 +67,7 @@ def make_simple_evaluate(config):
 
 
 def make_simple_duplicate_evaluate(config):
-    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
+    eval_env = BridgeBidding("dds_results/test_000.npy")
     team1_forward_pass = make_forward_pass(
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
@@ -200,8 +200,8 @@ def make_simple_duplicate_evaluate(config):
 
 
 def make_evaluate(config, duplicate=False):
-    eval_env = bb.BridgeBidding("dds_results/test_000.npy")
-    # eval_env = bb.BridgeBidding("workspace/100_hash.npy")
+    eval_env = BridgeBidding("dds_results/test_000.npy")
+    # eval_env = BridgeBidding("workspace/100_hash.npy")
     actor_forward_pass = make_forward_pass(
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
@@ -1154,7 +1154,7 @@ if __name__ == "__main__":
         activation=config["ACTOR_ACTIVATION"],
         model_type=config["ACTOR_MODEL_TYPE"],
     )
-    env = bb.BridgeBidding()
+    env = BridgeBidding()
     rng = jax.random.PRNGKey(0)
     rng, _rng = jax.random.split(rng)
     init_x = jnp.zeros((1,) + env.observation_shape)
