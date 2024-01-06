@@ -8,25 +8,30 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 
 run supervised learning
 ```bash
-python supervised_learning.py --data_path DATA_PATH [--save_path SAVE_PATH]
+python supervised_learning.py data_path=DATA_PATH [save_path=SAVE_PATH]
 ```
 
 Arguments
 ```bash
---data path    Path to the directory where the training dataset is located
+data_path    Path to the directory where the training dataset is located
 
---save_path    Path to the directory where the trained model will be saved
+save_path    Path to the directory where the trained model will be saved
 ```
 ### Reinforcement Learning
+Please prepare a baseline model for evaluation.  
+For example, conduct supervised learning and save the trained model.
+Alternatively, please use the provided pre-trained model.
 ```bash
-python ppo.py
+python ppo.py eval_opp_model_path=EVAL_OPP_MODEL_PATH
 ```
+Arguments
+
 example
 ```bash
 python ppo.py NUM_ENVS=10 NUM_STEPS=5 TOTAL_TIMESTEPS=1000 UPDATE_EPOCHS=2 \
  MINIBATCH_SIZE=10 NUM_EVAL_ENVS=10 TRACK=False
 ```
-Arguments
+
 ```
 NUM_ENVS
   

@@ -55,7 +55,7 @@ class PPOConfig(BaseModel):
     NUM_EVAL_ENVS: int = 10000
     EVAL_OPP_ACTIVATION: str = "relu"
     EVAL_OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
-    EVAL_OPP_MODEL_PATH: str = "sl_log/sl_deepmind/params-400000.pkl"
+    EVAL_OPP_MODEL_PATH: str = None
     NUM_EVAL_STEP: int = 10
     # log config
     SAVE_MODEL: bool = False
@@ -63,11 +63,11 @@ class PPOConfig(BaseModel):
     LOG_PATH: str = "rl_log"
     EXP_NAME: str = "exp_0000"
     MODEL_SAVE_PATH: str = "rl_params"
-    TRACK: bool = False
+    TRACK: bool = True
 
     # actor config
     LOAD_INITIAL_MODEL: bool = False
-    INITIAL_MODEL_PATH: str = "sl_log/sl_deepmind_actor_critic/params-400000.pkl"
+    INITIAL_MODEL_PATH: str = None
     ACTOR_ACTIVATION: str = "relu"
     ACTOR_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
     # opposite config
@@ -262,16 +262,6 @@ def train(config, rng):
                     "wb",
                 ) as writer:
                     pickle.dump(runner_state[0], writer)
-                with open(
-                    os.path.join(
-                        config["LOG_PATH"],
-                        config["EXP_NAME"],
-                        config["MODEL_SAVE_PATH"],
-                        f"opt_state-{i:08}.pkl",
-                    ),
-                    "wb",
-                ) as writer:
-                    pickle.dump(runner_state[1], writer)
 
         # eval
         time_eval_sta = time.time()
