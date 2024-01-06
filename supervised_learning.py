@@ -18,7 +18,7 @@ import optax
 
 import pyspiel
 import wandb
-from src.models import ActorCritic, ActorNN
+from src.models import ActorCritic
 import distrax
 
 OptState = Any
