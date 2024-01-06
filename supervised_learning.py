@@ -13,10 +13,6 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 import os
 import pickle
 from typing import Any
-
-from absl import app
-from absl import flags
-
 import haiku as hk
 import jax
 from jax import numpy as jnp
@@ -27,11 +23,15 @@ import pyspiel
 import wandb
 from src.models import ActorCritic, ActorNN
 import distrax
+from omegaconf import OmegaConf
+from pydantic import BaseModel
+from typing import Literal
+import sys
 
 OptState = Any
 Params = Any
 
-FLAGS = flags.FLAGS
+
 GAME = pyspiel.load_game("bridge(use_double_dummy_result=false)")
 NUM_ACTIONS = 38
 MIN_ACTION = 52
@@ -39,18 +39,23 @@ NUM_CARDS = 52
 NUM_PLAYERS = 4
 TOP_K_ACTIONS = 5  # How many alternative actions to display
 
-flags.DEFINE_integer("iterations", 400000, "Number of iterations")
-flags.DEFINE_string("data_path", None, "Location for data")
-flags.DEFINE_integer("eval_every", 10000, "How often to evaluate the policy")
-flags.DEFINE_integer("num_examples", 3, "How many examples to print per evaluation")
-flags.DEFINE_integer("train_batch", 128, "Batch size for training step")
-flags.DEFINE_integer("eval_batch", 10000, "Batch size when evaluating")
-flags.DEFINE_integer("rng_seed", 42, "Seed for initial network weights")
-flags.DEFINE_string("save_path", None, "Location for saved networks")
-flags.DEFINE_float("learning_rate", 1e-4, "Learning rate for optimizer")
-flags.DEFINE_float("entropy_coef", 0, "coef for entropy term")
-flags.DEFINE_string("model_type", "DeepMind", "model type of NN, DeepMind or FAIR")
-flags.DEFINE_string("activation", "relu", "activation for NN")
+
+class supervisedLearningConfig(BaseModel):
+    iterations: int = 400000
+    data_path: str = None
+    eval_every: int = 10000
+    num_examples: int = 3
+    train_batch: int = 128
+    eval_batch: int = 10000
+    rng_seed: int = 42
+    save_path: str = None
+    learning_rate: float = 1e-4
+    entropy_coef: float = 0
+    type_of_model: Literal["DeepMind", "FAIR"] = "DeepMind"
+    activation: str = "relu"
+
+
+args = supervisedLearningConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 
 
 def _no_play_trajectory(line: str):
@@ -108,33 +113,31 @@ def one_hot(x, k):
 
 def actor_critic_net_fn(x):
     net = ActorCritic(
-        action_dim=38, activation=FLAGS.activation, model=FLAGS.model_type
+        action_dim=38, activation=args.activation, model=args.type_of_model
     )
     logits, value = net(x)
     return logits
 
 
-def main(argv):
+def main():
     wandb.init(
         project="wbride5_learning",
         config={
-            "ITERATIONS": FLAGS.iterations,
-            "TRAIN_BATCH": FLAGS.train_batch,
-            "lr": FLAGS.learning_rate,
-            "model_type": FLAGS.model_type,
-            "activation": FLAGS.activation,
-            "entropy_coef": FLAGS.entropy_coef,
+            "ITERATIONS": args.iterations,
+            "TRAIN_BATCH": args.train_batch,
+            "lr": args.learning_rate,
+            "type_of_model": args.type_of_model,
+            "activation": args.activation,
+            "entropy_coef": args.entropy_coef,
         },
     )
     config = wandb.config
     print(config)
-    if len(argv) > 1:
-        raise app.UsageError("Too many command-line arguments.")
 
     # Make the network.
     net = hk.without_apply_rng(hk.transform(actor_critic_net_fn))
     # Make the optimiser.
-    opt = optax.adam(FLAGS.learning_rate)
+    opt = optax.adam(args.learning_rate)
 
     @jax.jit
     def loss(
@@ -151,7 +154,7 @@ def main(argv):
         masked_logits = logits + jnp.finfo(np.float64).min * (~legal_actions)
         masked_pi = distrax.Categorical(masked_logits)
         entropy = masked_pi.entropy().mean()
-        total_loss = target_loss - FLAGS.entropy_coef * entropy
+        total_loss = target_loss - args.entropy_coef * entropy
         return total_loss, (target_loss, entropy)
 
     @jax.jit
@@ -184,7 +187,7 @@ def main(argv):
         if max_samples == 0:
             return
         count = 0
-        with open(os.path.join(FLAGS.data_path, "test.txt")) as f:
+        with open(os.path.join(args.data_path, "test.txt")) as f:
             lines = list(f)
         np.random.shuffle(lines)
         for line in lines:
@@ -213,29 +216,34 @@ def main(argv):
                 return
 
     # Make datasets.
-    if FLAGS.data_path is None:
-        raise app.UsageError(
+    try:
+        train = batch(
+            make_dataset(os.path.join(args.data_path, "train.txt")),
+            args.train_batch,
+        )
+        test = batch(
+            make_dataset(os.path.join(args.data_path, "test.txt")),
+            args.eval_batch,
+        )
+        # Initialization of the generator
+        inputs, unused_targets, unused_legal_actions = next(train)
+    except Exception as e:
+        print(e, file=sys.stderr)
+        print(
             "Please generate your own supervised training data or download from "
             "https://console.cloud.google.com/storage/browser/openspiel-data/bridge"
-            " and supply the local location as --data_path"
+            " and supply the local location as --data_path",
+            file=sys.stderr,
         )
-    train = batch(
-        make_dataset(os.path.join(FLAGS.data_path, "train.txt")),
-        FLAGS.train_batch,
-    )
-    test = batch(
-        make_dataset(os.path.join(FLAGS.data_path, "test.txt")),
-        FLAGS.eval_batch,
-    )
+        sys.exit(1)
 
     # Initialize network and optimiser.
-    rng = jax.random.PRNGKey(FLAGS.rng_seed)  # seed used for network weights
-    inputs, unused_targets, unused_legal_actions = next(train)
+    rng = jax.random.PRNGKey(args.rng_seed)  # seed used for network weights
     params = net.init(rng, inputs)
     opt_state = opt.init(params)
 
     # Train/eval loop.
-    for step in range(FLAGS.iterations):
+    for step in range(args.iterations):
         # Do SGD on a batch of training examples.
         inputs, targets, legal_actions = next(train)
         params, opt_state, train_loss = update(
@@ -251,7 +259,7 @@ def main(argv):
         }
 
         # Periodically evaluate classification accuracy on the test set.
-        if (1 + step) % FLAGS.eval_every == 0:
+        if (1 + step) % args.eval_every == 0:
             inputs, targets, legal_actions = next(test)
             test_accuracy = accuracy(params, inputs, targets)
             test_loss = loss(params, inputs, targets, legal_actions)
@@ -268,15 +276,15 @@ def main(argv):
                 "test/test_accuracy": test_accuracy,
                 "test/illegal_actions_prob": illegal_action_prob.mean(),
             }
-            if FLAGS.save_path is not None:
-                filename = os.path.join(FLAGS.save_path, f"params-{1 + step}.pkl")
+            if args.save_path is not None:
+                filename = os.path.join(args.save_path, f"params-{1 + step}.pkl")
                 with open(filename, "wb") as pkl_file:
                     pickle.dump(params, pkl_file)
-            output_samples(params, FLAGS.num_examples)
+            output_samples(params, args.num_examples)
             wandb.log({**test_metrics})
         wandb.log({**metrics})
     wandb.finish()
 
 
 if __name__ == "__main__":
-    app.run(main)
+    main()
