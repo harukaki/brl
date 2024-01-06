@@ -277,6 +277,7 @@ def main():
                 "test/illegal_actions_prob": illegal_action_prob.mean(),
             }
             if args.save_path is not None:
+                os.makedirs(args.save_path, exist_ok=True)
                 filename = os.path.join(args.save_path, f"params-{1 + step}.pkl")
                 with open(filename, "wb") as pkl_file:
                     pickle.dump(params, pkl_file)
