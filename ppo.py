@@ -329,7 +329,7 @@ def train(config, rng):
                             exp_values = np.exp(
                                 (x - np.max(x, axis=-1, keepdims=True))
                                 / config["PRIOR_T"]
-                            )  # 数値安定性のために最大値を引く
+                            )
                             probabilities = exp_values / np.sum(
                                 exp_values, axis=-1, keepdims=True
                             )
@@ -531,7 +531,7 @@ if __name__ == "__main__":
         wandb.init(
             project="ppo-bridge",
             name=args.EXP_NAME,
-            config=args.dict(),
+            config=args.model_dump(),
             save_code=True,
         )
         os.mkdir(os.path.join(config["LOG_PATH"], config["EXP_NAME"]))
