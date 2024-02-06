@@ -3,6 +3,7 @@
   https://github.com/luchris429/purejaxrl
 
 Please refer to their work if you use this example in your research."""
+
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -44,13 +45,13 @@ class PPOConfig(BaseModel):
     TOTAL_TIMESTEPS: int = 2_621_440_000
     UPDATE_EPOCHS: int = 10  # 一回のupdateでbatchが何回学習されるか
     NUM_MINIBATCHES: int = 128
-    NUM_UPDATES: int = 10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
+    NUM_UPDATES: int = (
+        10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
+    )
     MINIBATCH_SIZE: int = 1024  # update中の1 epochで使用される数
     # dataset config
     DDS_RESULTS_DIR: str = "dds_results"
     HASH_SIZE: int = 100_000
-    TRAIN_SIZE: int = 12_500_000
-    HASH_TABLE_NUM: int = 125
     # eval config
     NUM_EVAL_ENVS: int = 10000
     EVAL_OPP_ACTIVATION: str = "relu"
@@ -199,7 +200,7 @@ def train(config, rng):
     roll_out_list = []
     train_dds_results_list = sorted(
         [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
-    )[: config["HASH_TABLE_NUM"]]
+    )
 
     # dds_resultsの異なるhash tableをloadしたenvを用意
     for file in train_dds_results_list:
@@ -220,7 +221,7 @@ def train(config, rng):
     roll_out = roll_out_list[0]
     env_state = init(reset_rng)
 
-    hash_index_list = np.arange(config["HASH_TABLE_NUM"])
+    hash_index_list = np.arange(len(train_dds_results_list))
     steps = 0
     hash_index = 0
     board_count = 0
@@ -522,7 +523,6 @@ if __name__ == "__main__":
         "EVAL_OPP_ACTIVATION": args.EVAL_OPP_ACTIVATION,
         "EVAL_OPP_MODEL_TYPE": args.EVAL_OPP_MODEL_TYPE,
         "EVAL_OPP_MODEL_PATH": args.EVAL_OPP_MODEL_PATH,
-        "HASH_TABLE_NUM": args.HASH_TABLE_NUM,
         "NUM_EVAL_STEP": args.NUM_EVAL_STEP,
         "VALUE_CLIPPING": args.VALUE_CLIPPING,
         "GLOBAL_GRADIENT_CLIPPING": args.GLOBAL_GRADIENT_CLIPPING,
