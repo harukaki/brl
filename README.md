@@ -26,7 +26,7 @@ Examples
 Run reinforcement learning without load initial model
 
 ```bash
-python new_ppo.py EXP_NAME=exp0000 NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
+python ppo.py EXP_NAME=exp0000 NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
 TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
 VE_COEF=0.5 EVAL_OPP_MODEL_PATH=your_baseline_model_path LOAD_INITIAL_MODEL=False 
 ```
@@ -45,7 +45,7 @@ CLIP_EPS              Clip for ppo
 ENT_COEF              Entropy coefficient
 VF_COEF               Value loss coefficient
 EVAL_OPP_MODEL_PATH   Path to the baseline model prepared for evaluation
-LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial values for the neural network
+LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial parameters for the neural network
 ```
 
 Run reinforcement learning with load initial model
@@ -53,7 +53,7 @@ Run reinforcement learning with load initial model
 ```bash
 python ppo.py EXP_NAME=exp0000 NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
 TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-VE_COEF=0.5 EVAL_OPP_MODEL_PATH=your_baseline_model_path LOAD_INITIAL_MODEL=True
+VE_COEF=0.5 EVAL_OPP_MODEL_PATH=your_baseline_model_path LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=your_baseline_model_path
 ```
 Aguments
 ```
@@ -71,4 +71,5 @@ ENT_COEF              Entropy coefficient
 VF_COEF               Value loss coefficient
 EVAL_OPP_MODEL_PATH   Path to the baseline model prepared for evaluation
 LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial values for the neural network
+INITIAL_MODEL_PATH    Path to the baseline model prepared for the initial parameters for the neural network
 ```
