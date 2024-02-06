@@ -3,7 +3,7 @@ reinforcement learning for bridge
 
 ## Usage
 ### Supervised Learning from Wbridge5 datasets
-Please download the files "train.txt" and "test.txt" from the following URL and place them in the data_path directory.
+Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_directory`.
 https://console.cloud.google.com/storage/browser/openspiel-data/bridge  
 
 run supervised learning
