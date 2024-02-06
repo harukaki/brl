@@ -12,7 +12,7 @@ python supervised_learning.py iterations=400000 train_batch=128 learning_rate=0.
 ```
 
 Arguments
-```bash
+```
 iterations     Number of epochs
 train_batch    Minibatche size
 learning_rate  Learning rate for Adam
