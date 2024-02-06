@@ -3,12 +3,12 @@ reinforcement learning for bridge
 
 ## Usage
 ### Supervised Learning from Wbridge5 datasets
-Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_directory`.
+Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.
 https://console.cloud.google.com/storage/browser/openspiel-data/bridge  
 
 run supervised learning
 ```bash
-python supervised_learning.py data_path=DATA_PATH [save_path=SAVE_PATH]
+python supervised_learning.py data_path=your_data_directory [save_path=your_model_directory]
 ```
 
 Arguments
