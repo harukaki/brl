@@ -8,14 +8,16 @@ https://console.cloud.google.com/storage/browser/openspiel-data/bridge
 
 Run supervised learning
 ```bash
-python supervised_learning.py data_path=your_data_directory [save_path=your_model_directory]
+python supervised_learning.py iterations=400000 train_batch=128 learning_rate=0.0001 data_path=your_data_directory save_path=your_model_directory
 ```
 
 Arguments
 ```bash
-data_path    Path to the directory where the training dataset is located
-
-save_path    Path to the directory where the trained model will be saved
+iterations     Number of epochs
+train_batch    Minibatche size
+learning_rate  Learning rate for Adam
+data_path      Path to the directory where the training dataset is located
+save_path      Path to the directory where the trained model will be saved
 ```
 ### Reinforcement Learning
 Please prepare a baseline model for evaluation.  
