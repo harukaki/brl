@@ -44,10 +44,13 @@ VE_COEF=0.5 EVAL_OPP_MODEL_PATH=your_baseline_model_path LOAD_INITIAL_MODEL=True
 Aguments
 ```
 EXP_NAME              Name of experiment
+# rollout settings
 NUM_ENVS              Number of parallels for each actor rollout
 NUM_STEPS             Number of steps for each actor rollout
 MINIBATCH_SIZE        Minibatch size
 TOTAL_TIMESTEPS       Number of steps experienced by the end of the training
+
+# ppo settings
 UPDATE_EPOCHS         Number of epochs for ppo update
 LR                    Learning rate for Adam
 GAMMA　　　　　　　　　　Discount factor gamma
@@ -55,6 +58,8 @@ GAE_LAMBDA　　　　　　　GAE lambda
 CLIP_EPS              Clip for ppo
 ENT_COEF              Entropy coefficient
 VF_COEF               Value loss coefficient
+
+# other settings
 EVAL_OPP_MODEL_PATH   Path to the baseline model prepared for evaluation
 LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial values for the neural network
 INITIAL_MODEL_PATH    Path to the initial model for the neural network
