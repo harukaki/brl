@@ -7,7 +7,11 @@ Please install the appropriate versions of jax and jaxlib according to your exec
 ```bash
 pip install -r requirements.txt
 ```
-
+For bridge bidding in pgx, downloading the Double Dummy Solver (DDS) dataset is required. Please download the DDS dataset according to [pgx bridge bidding documentation](https://github.com/sotetsuk/pgx/blob/main/docs/bridge_bidding.md).
+```py
+from pgx.bridge_bidding import download_dds_results
+download_dds_results()
+```
 
 ### 2. Supervised Learning from Wbridge5 datasets
 Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.
@@ -30,8 +34,7 @@ save_path      Path to the directory where the trained model will be saved
 ```
 ### 3. Reinforcement Learning
 Please prepare a baseline model for evaluation.  
-For example, it is a model created with the above-mentioned supervised learning.
-Alternatively, please use the provided pre-trained model.  
+For example, it is a model created with the above-mentioned supervised learning. 
 
 Examples  
 Run reinforcement learning without loading initial model.
