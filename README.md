@@ -3,7 +3,8 @@ reinforcement learning for bridge
 
 ## Usage
 ### 1. Installation
-Please install the appropriate versions of jax and jaxlib according to your execution environment. We use pgx as the environment for bridge. Currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx).
+Please install the appropriate versions of jax and jaxlib according to your execution environment.  
+We use pgx as the environment for bridge. Currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx).
 ```bash
 pip install -r requirements.txt
 ```
