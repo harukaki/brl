@@ -16,7 +16,7 @@ download_dds_results()
 ```
 
 ### 2. Supervised Learning from Wbridge5 datasets
-Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.
+Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.  
 https://console.cloud.google.com/storage/browser/openspiel-data/bridge  
 
 Run supervised learning
@@ -35,7 +35,7 @@ data_path      Path to the directory where the training dataset is located
 save_path      Path to the directory where the trained model will be saved
 ```
 ### 3. Reinforcement Learning
-Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.
+Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.  
 For example, it is a model created with the above-mentioned supervised learning. 
 
 Examples  
@@ -50,7 +50,7 @@ LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE
 ```
 
 Run reinforcement learning with loading initial model.  
-Please prepare a initial model for the neural network and enter its file path in `your_initial_model_path`.
+Please prepare a initial model for the neural network and enter its file path in `your_initial_model_path`.  
 For example, it is a model created with the above-mentioned supervised learning.
 
 ```bash
