@@ -4,10 +4,10 @@ from typing import NamedTuple, Any, Literal
 import jax.numpy as jnp
 import numpy as np
 from src.utils import (
+    auto_reset,
     single_play_step_two_policy_commpetitive,
     single_play_step_free_run,
 )
-from pgx.experimental import auto_reset
 
 
 class Transition(NamedTuple):
