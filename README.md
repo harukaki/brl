@@ -2,14 +2,14 @@
 reinforcement learning for bridge
 
 ## Usage
-### Installation
-Please install the appropriate versions of jax and jaxlib according to your execution environment. We use pgx as the environment for bridge. Currently, we support version 1.4.0 of pgx.
+### 1. Installation
+Please install the appropriate versions of jax and jaxlib according to your execution environment. We use pgx as the environment for bridge. Currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx){:target="_blank"}.
 ```bash
 pip install -r requirements.txt
 ```
 
 
-### Supervised Learning from Wbridge5 datasets
+### 2. Supervised Learning from Wbridge5 datasets
 Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.
 https://console.cloud.google.com/storage/browser/openspiel-data/bridge  
 
@@ -28,7 +28,7 @@ eval_every     Interval for evaluation and model saving
 data_path      Path to the directory where the training dataset is located
 save_path      Path to the directory where the trained model will be saved
 ```
-### Reinforcement Learning
+### 3. Reinforcement Learning
 Please prepare a baseline model for evaluation.  
 For example, it is a model created with the above-mentioned supervised learning.
 Alternatively, please use the provided pre-trained model.  
