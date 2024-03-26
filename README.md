@@ -10,7 +10,7 @@ Parameters trained by this repository are published.
 | model-pretrained-rl-with-fsp.pkl  | RL after SL pretraining with FSP                |  1.24 IMPs/b           |
 | model-pretrained-rl-with-pfsp.pkl | RL after SL pretraining with mix of SP and PFSP |  0.89 IMPs/b           |
 
-For more details on each training, please refer to bridge_models/README in the repository.
+For more details on each training, please refer to `bridge_models/README`.
 ## Usage
 ### 1. Installation
 Please install the necessary packages according to the `requirements.txt`.  
