@@ -2,8 +2,21 @@
 reinforcement learning for bridge
 
 ## Usage
-### Supervised Learning from Wbridge5 datasets
-Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.
+### 1. Installation
+Please install the necessary packages according to the `requirements.txt`.  
+Note that you need to install the appropriate versions of jax and jaxlib according to your execution environment.  
+Additionally, we are using pgx as the environment for bridge, and currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx). 
+```bash
+pip install -r requirements.txt
+```
+For bridge bidding in pgx, downloading the Double Dummy Solver (DDS) dataset is required. Please download the DDS dataset according to [pgx bridge bidding documentation](https://github.com/sotetsuk/pgx/blob/main/docs/bridge_bidding.md).
+```py
+from pgx.bridge_bidding import download_dds_results
+download_dds_results()
+```
+
+### 2. Supervised Learning from Wbridge5 datasets
+Please download the files "train.txt" and "test.txt" from the following URL and place them in the `your_data_directory`.  
 https://console.cloud.google.com/storage/browser/openspiel-data/bridge  
 
 Run supervised learning
@@ -21,12 +34,12 @@ eval_every     Interval for evaluation and model saving
 data_path      Path to the directory where the training dataset is located
 save_path      Path to the directory where the trained model will be saved
 ```
-### Reinforcement Learning
-Please prepare a baseline model for evaluation.  
-For example, it is a model created with the above-mentioned supervised learning.
-Alternatively, please use the provided pre-trained model.  
+### 3. Reinforcement Learning
+Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.  
+For example, it is a model created with the above-mentioned supervised learning. 
 
 Examples  
+  
 Run reinforcement learning without loading initial model.
 
 ```bash
@@ -37,7 +50,7 @@ LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE
 ```
 
 Run reinforcement learning with loading initial model.  
-Please prepare a initial model for the neural network.  
+Please prepare a initial model for the neural network and enter its file path in `your_initial_model_path`.  
 For example, it is a model created with the above-mentioned supervised learning.
 
 ```bash

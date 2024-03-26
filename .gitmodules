@@ -1,0 +1,3 @@
+[submodule "bridge_env"]
+	path = submodule/bridge_env
+	url = https://github.com/yotaroy/bridge_env.git
