@@ -38,17 +38,47 @@ print(jax.local_devices())
 
 
 class PPOConfig(BaseModel):
+    """Configuration settings for PPO (Proximal Policy Optimization) training, evaluation, and logging.
+    
+    Attributes
+        # rollout settings
+        NUM_ENVS              Number of parallels for each actor rollout
+        NUM_STEPS             Number of steps for each actor rollout
+        MINIBATCH_SIZE        Minibatch size
+        TOTAL_TIMESTEPS       Number of steps experienced by the end of the training
+
+        # ppo settings
+        UPDATE_EPOCHS         Number of epochs for ppo update
+        LR                    Learning rate for Adam
+        GAMMA                 Discount factor gamma
+        GAE_LAMBDA            GAE lambda
+        CLIP_EPS              Clip for ppo
+        ENT_COEF              Entropy coefficient
+        VF_COEF               Value loss coefficient
+
+        # evaluation settings
+        NUM_EVAL_ENVS         Number of parallels for evaluation
+        EVAL_OPP_MODEL_PATH   Path to the baseline model prepared for evaluation
+        NUM_EVAL_STEP         Interval for evaluation
+
+        # other settings
+        LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial values for the neural network
+        INITIAL_MODEL_PATH    Path to the initial model for the neural network
+        LOG_PATH              Path to the directory where training settings and trained models are saved
+        EXP_NAME              Name of experiment
+        SAVE_MODEL            Whether to save the trained model
+        SAVE_MODEL_INTERVAL   Interval for saving the trained model
+    """
     SEED: int = 0
-    LR: float = 0.000001  # 0.0003
+    LR: float = 0.000001  
     NUM_ENVS: int = 8192
     NUM_STEPS: int = 32
     TOTAL_TIMESTEPS: int = 2_621_440_000
-    UPDATE_EPOCHS: int = 10  # 一回のupdateでbatchが何回学習されるか
+    UPDATE_EPOCHS: int = 10  
     NUM_MINIBATCHES: int = 128
     NUM_UPDATES: int = (
-        10000  # updateが何回されるか　TOTAL_TIMESTEPS // NUM_STEPS // NUM_ENV
+        10000  
     )
-    MINIBATCH_SIZE: int = 1024  # update中の1 epochで使用される数
     # dataset config
     DDS_RESULTS_DIR: str = "dds_results"
     HASH_SIZE: int = 100_000
