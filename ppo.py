@@ -59,7 +59,7 @@ class PPOConfig(BaseModel):
     EVAL_OPP_MODEL_PATH: str = None
     NUM_EVAL_STEP: int = 10
     # log config
-    SAVE_MODEL: bool = False
+    SAVE_MODEL: bool = True
     SAVE_MODEL_INTERVAL: int = 1
     LOG_PATH: str = "rl_log"
     EXP_NAME: str = "exp_0000"
@@ -179,9 +179,35 @@ def train(config, rng):
 
     # MAKE EVAL
     rng, eval_rng = jax.random.split(rng)
-    simple_evaluate = make_simple_evaluate(config)
-    simple_duplicate_evaluate = make_simple_duplicate_evaluate(config)
-    duplicate_evaluate = make_evaluate(config, duplicate=True)
+    eval_env = BridgeBidding("dds_results/test_000.npy")
+    simple_evaluate = make_simple_evaluate(
+        eval_env=eval_env,
+        team1_activation=config["ACTOR_ACTIVATION"],
+        team1_model_type=config["ACTOR_MODEL_TYPE"],
+        team2_activation=config["EVAL_OPP_ACTIVATION"],
+        team2_model_type=config["EVAL_OPP_MODEL_TYPE"],
+        team2_model_path=config["EVAL_OPP_MODEL_PATH"],
+        num_eval_envs=config["NUM_EVAL_ENVS"],
+    )
+    simple_duplicate_evaluate = make_simple_duplicate_evaluate(
+        eval_env=eval_env,
+        team1_activation=config["ACTOR_ACTIVATION"],
+        team1_model_type=config["ACTOR_MODEL_TYPE"],
+        team2_activation=config["ACTOR_ACTIVATION"],
+        team2_model_type=config["ACTOR_MODEL_TYPE"],
+        num_eval_envs=config["NUM_PRIORITIZED_ENVS"],
+    )
+    duplicate_evaluate = make_evaluate(
+        eval_env=eval_env,
+        team1_activation=config["ACTOR_ACTIVATION"],
+        team1_model_type=config["ACTOR_MODEL_TYPE"],
+        team2_activation=config["EVAL_OPP_ACTIVATION"],
+        team2_model_type=config["EVAL_OPP_MODEL_TYPE"],
+        team2_model_path=config["EVAL_OPP_MODEL_PATH"],
+        num_eval_envs=config["NUM_EVAL_ENVS"],
+        game_mode=config["GAME_MODE"],
+        duplicate=True,
+    )
     jit_simple_evaluate = jax.jit(simple_evaluate)
     jit_simple_duplicate_evaluate = jax.jit(simple_duplicate_evaluate)
     jit_diplicate_evaluate = jax.jit(duplicate_evaluate)

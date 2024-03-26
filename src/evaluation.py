@@ -1,32 +1,32 @@
 import jax
 import jax.numpy as jnp
 import numpy as np
-import optax
-from typing import Sequence, NamedTuple, Any, Literal, Type
 import distrax
-import os
-from pgx.bridge_bidding import BridgeBidding
 import pickle
-import wandb
 from src.duplicate import duplicate_step, Table_info
 from src.models import make_forward_pass
 from src.utils import single_play_step_two_policy_commpetitive_deterministic
-from pprint import pprint
 
 
-def make_simple_evaluate(config):
-    eval_env = BridgeBidding("dds_results/test_000.npy")
-    # eval_env = BridgeBidding("workspace/100_hash.npy")
+def make_simple_evaluate(
+    eval_env,
+    team1_activation,
+    team1_model_type,
+    team2_activation,
+    team2_model_type,
+    team2_model_path,
+    num_eval_envs,
+):
+
     actor_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
+        activation=team1_activation,
+        model_type=team1_model_type,
     )
     opp_forward_pass = make_forward_pass(
-        activation=config["EVAL_OPP_ACTIVATION"],
-        model_type=config["EVAL_OPP_MODEL_TYPE"],
+        activation=team2_activation,
+        model_type=team2_model_type,
     )
-    opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
-    num_eval_envs = config["NUM_EVAL_ENVS"]
+    opp_params = pickle.load(open(team2_model_path, "rb"))
 
     def get_fn(x, i):
         return x[i]
@@ -66,26 +66,33 @@ def make_simple_evaluate(config):
     return simple_evaluate
 
 
-def make_simple_duplicate_evaluate(config):
-    eval_env = BridgeBidding("dds_results/test_000.npy")
+def make_simple_duplicate_evaluate(
+    eval_env,
+    team1_activation,
+    team1_model_type,
+    team2_activation,
+    team2_model_type,
+    num_eval_envs,
+):
+
     team1_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
+        activation=team1_activation,
+        model_type=team1_model_type,
     )
-    team2_forward_pass = team1_forward_pass
-    num_eval_envs = config["NUM_PRIORITIZED_ENVS"]
+    team2_forward_pass = make_forward_pass(
+        activation=team2_activation,
+        model_type=team2_model_type,
+    )
 
     def duplicate_evaluate(
         team1_params,
         team2_params,
-        # num_eval_envs,
         rng_key,
     ):
         step_fn = duplicate_step(eval_env.step)
         rng_key, sub_key = jax.random.split(rng_key)
         subkeys = jax.random.split(sub_key, num_eval_envs)
         state = jax.vmap(eval_env.init)(subkeys)
-        # state.save_svg("svg/eval_init.svg")
         cum_return = jnp.zeros(num_eval_envs)
         table_a_info = Table_info(
             terminated=state.terminated,
@@ -161,7 +168,6 @@ def make_simple_duplicate_evaluate(config):
                 state.rewards, jnp.zeros_like(state.current_player)
             )
             count += 1
-            # state.save_svg(f"svg/{count}.svg")
             return (
                 state,
                 table_a_info,
@@ -190,7 +196,6 @@ def make_simple_duplicate_evaluate(config):
                 count,
             ),
         )
-        # state.save_svg("svg/duplicate.svg")
         std_error = jnp.std(cum_return, ddof=1) / jnp.sqrt(len(cum_return))
         win_rate = jnp.sum(cum_return > 0) / num_eval_envs
         log_info = (cum_return.mean(), std_error, win_rate)
@@ -199,26 +204,34 @@ def make_simple_duplicate_evaluate(config):
     return duplicate_evaluate
 
 
-def make_evaluate(config, duplicate=False):
-    eval_env = BridgeBidding("dds_results/test_000.npy")
-    # eval_env = BridgeBidding("workspace/100_hash.npy")
+def make_evaluate(
+    eval_env,
+    team1_activation,
+    team1_model_type,
+    team2_activation,
+    team2_model_type,
+    team2_model_path,
+    num_eval_envs,
+    game_mode,
+    duplicate=False,
+):
+
     actor_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
+        activation=team1_activation,
+        model_type=team1_model_type,
     )
     opp_forward_pass = make_forward_pass(
-        activation=config["EVAL_OPP_ACTIVATION"],
-        model_type=config["EVAL_OPP_MODEL_TYPE"],
+        activation=team2_activation,
+        model_type=team2_model_type,
     )
-    opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
-    num_eval_envs = config["NUM_EVAL_ENVS"]
+    opp_params = pickle.load(open(team2_model_path, "rb"))
 
-    if config["GAME_MODE"] == "competitive":
+    if game_mode == "competitive":
         opp_forward_pass = make_forward_pass(
-            activation=config["EVAL_OPP_ACTIVATION"],
-            model_type=config["EVAL_OPP_MODEL_TYPE"],
+            activation=team2_activation,
+            model_type=team2_model_type,
         )
-        opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
+        opp_params = pickle.load(open(team2_model_path, "rb"))
 
         def opp_make_action(state):
             logits, value = opp_forward_pass.apply(
@@ -231,7 +244,7 @@ def make_evaluate(config, duplicate=False):
             pi = distrax.Categorical(logits=logits)
             return (masked_pi.mode(), pi.probs)
 
-    elif config["GAME_MODE"] == "free-run":
+    elif game_mode == "free-run":
 
         def opp_make_action(state):
             pi_probs = jnp.zeros(38).at[0].set(True)
@@ -260,7 +273,7 @@ def make_evaluate(config, duplicate=False):
             (state, _, _, _) = tup
             return ~state.terminated.all()
 
-        def rl_make_action(state):
+        def actor_make_action(state):
             logits_old, value = actor_forward_pass.apply(
                 actor_params, state.observation
             )  # DONE
@@ -276,18 +289,7 @@ def make_evaluate(config, duplicate=False):
                 mask_logits,
             )
 
-        def pass_act(state):
-            pi_probs = jnp.zeros(38).at[0].set(0)
-            return (
-                jnp.int32(0),
-                pi_probs,
-                jnp.zeros(38, dtype=jnp.float32),
-                state.legal_action_mask,
-                jnp.zeros(38, dtype=jnp.float32),
-                jnp.zeros(38, dtype=jnp.float32),
-            )
-
-        def sl_make_action(state):
+        def opp_make_action(state):
             logits_old, value = opp_forward_pass.apply(
                 opp_params, state.observation
             )  # DONE
@@ -306,8 +308,8 @@ def make_evaluate(config, duplicate=False):
         def make_action(state):
             return jax.lax.cond(
                 (state.current_player == 0) | (state.current_player == 1),
-                lambda: rl_make_action(state),
-                lambda: sl_make_action(state),
+                lambda: actor_make_action(state),
+                lambda: opp_make_action(state),
             )
 
         def update_log_info(logits_old, mask, current_player, action, log_info):
@@ -385,9 +387,6 @@ def make_evaluate(config, duplicate=False):
 
         def loop_fn(tup):
             (state, cum_return, log_info, rewards) = tup
-
-            # current_player_position = _player_position(state.current_player, state)
-
             action, probs, logits, mask, logits_old, mask_logits = jax.vmap(
                 make_action
             )(state)
@@ -410,7 +409,6 @@ def make_evaluate(config, duplicate=False):
             cum_return = cum_return + jax.vmap(get_fn)(
                 state.rewards, jnp.zeros_like(state.current_player)
             )
-            # print(f"cum_return: {cum_return}")
             return (
                 state,
                 cum_return,
@@ -576,13 +574,9 @@ def make_evaluate(config, duplicate=False):
             opp_down_contract,
         ) = jax.vmap(make_terminated_log)(state, cum_return)
         pass_out_ratio = pass_out.sum() / num_eval_envs
-        actor_doubled_count = actor_doubled_contract.sum()
         actor_doubled_ratio = actor_doubled_contract.mean()
-        actor_redoubled_count = actor_redoubled_contract.sum()
         actor_redoubled_ratio = actor_redoubled_contract.mean()
-        opp_doubled_count = opp_doubled_contract.sum()
         opp_doubled_ratio = opp_doubled_contract.mean()
-        opp_redoubled_count = opp_redoubled_contract.sum()
         opp_redoubled_ratio = opp_redoubled_contract.mean()
         actor_declarer_count = actor_contract.sum()
         actor_declarer_ratio = actor_declarer_count / num_eval_envs
@@ -625,8 +619,6 @@ def make_evaluate(config, duplicate=False):
         state = jax.vmap(eval_env.init)(subkeys)
         # state.save_svg("svg/eval_init.svg")
         cum_return = jnp.zeros(num_eval_envs)
-        i = 0
-        states = []
         table_a_info = Table_info(
             terminated=state.terminated,
             rewards=state.rewards,
@@ -843,7 +835,6 @@ def make_evaluate(config, duplicate=False):
                 count,
             ),
         )
-        # state.save_svg("svg/duplicate.svg")
 
         def make_terminated_log(table_info):
             return jax.lax.cond(
@@ -964,10 +955,6 @@ def make_evaluate(config, duplicate=False):
             table_a_opp_down_contract,
         ) = jax.vmap(make_terminated_log)(table_a_info)
         table_a_pass_out_ratio = table_a_pass_out.sum() / num_eval_envs
-        table_a_actor_doubled_count = table_a_actor_doubled_contract.sum()
-        table_a_actor_redoubled_count = table_a_actor_redoubled_contract.sum()
-        table_a_opp_doubled_count = table_a_opp_doubled_contract.sum()
-        table_a_opp_redoubled_count = table_a_opp_redoubled_contract.sum()
         table_a_actor_declarer_count = table_a_actor_contract.sum()
         table_a_actor_declarer_ratio = table_a_actor_declarer_count / num_eval_envs
         table_a_opp_declarer_count = table_a_opp_contract.sum()
@@ -988,10 +975,6 @@ def make_evaluate(config, duplicate=False):
             table_b_opp_down_contract,
         ) = jax.vmap(make_terminated_log)(table_b_info)
         table_b_pass_out_ratio = table_b_pass_out.sum() / num_eval_envs
-        table_b_actor_doubled_count = table_b_actor_doubled_contract.sum()
-        table_b_actor_redoubled_count = table_b_actor_redoubled_contract.sum()
-        table_b_opp_doubled_count = table_b_opp_doubled_contract.sum()
-        table_b_opp_redoubled_count = table_b_opp_redoubled_contract.sum()
         table_b_actor_declarer_count = table_b_actor_contract.sum()
         table_b_actor_declarer_ratio = table_b_actor_declarer_count / num_eval_envs
         table_b_opp_declarer_count = table_b_opp_contract.sum()
@@ -1108,18 +1091,18 @@ def make_evaluate_log(log_info):
 
     for number in numbers:
         for suit in suits:
-            actor_bid_probs_dict[
-                f"eval/actor_bid_probs/{number}{suit}"
-            ] = actor_bid_mean[index]
+            actor_bid_probs_dict[f"eval/actor_bid_probs/{number}{suit}"] = (
+                actor_bid_mean[index]
+            )
             opp_bid_probs_dict[f"eval/opp_bid_probs/{number}{suit}"] = opp_bid_mean[
                 index
             ]
-            actor_contract_probs_dict[
-                f"eval/actor_contract_probs/{number}{suit}"
-            ] = actor_contract_mean[index]
-            opp_contract_probs_dict[
-                f"eval/opp_contract_probs/{number}{suit}"
-            ] = opp_contract_mean[index]
+            actor_contract_probs_dict[f"eval/actor_contract_probs/{number}{suit}"] = (
+                actor_contract_mean[index]
+            )
+            opp_contract_probs_dict[f"eval/opp_contract_probs/{number}{suit}"] = (
+                opp_contract_mean[index]
+            )
             index += 1
     log = {
         **log,
@@ -1130,67 +1113,3 @@ def make_evaluate_log(log_info):
     }
 
     return log
-
-
-if __name__ == "__main__":
-    key = "ffda4b38a6fd57db59331dd7ba8c7e316b179dd9"  # please specify your wandb key
-    wandb.login(key=key)
-    config = {
-        "ACTOR_ACTIVATION": "relu",
-        "ACTOR_MODEL_TYPE": "FAIR",
-        "OPP_ACTIVATION": "relu",
-        "OPP_MODEL_TYPE": "DeepMind",
-        "OPP_MODEL_PATH": "sl_log/sl_deepmind/params-400000.pkl",
-        "NUM_EVAL_ENVS": 4,
-        "LOG_PATH": "",
-        "EXP_NAME": "",
-        "PARAM_PATH": "rl_log/exp0067/rl_params/params-00000085.pkl",
-        "TRACK": True,
-        "GAME_MODE": "competitive",
-    }
-    if config["TRACK"]:
-        wandb.init(project="eval_test", config=config)
-    actor_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
-    )
-    env = BridgeBidding()
-    rng = jax.random.PRNGKey(0)
-    rng, _rng = jax.random.split(rng)
-    init_x = jnp.zeros((1,) + env.observation_shape)
-    params = actor_forward_pass.init(_rng, init_x)
-    params = pickle.load(
-        open(
-            os.path.join(
-                config["LOG_PATH"],
-                config["EXP_NAME"],
-                config["PARAM_PATH"],
-            ),
-            "rb",
-        )
-    )
-    evaluate = make_evaluate(config)
-    duplicate_evaluate = make_evaluate(config, duplicate=True)
-    jit_evaluate = jax.jit(evaluate)
-    print("start")
-    # state, log_info = jit_evaluate(params, rng)
-    """
-    if config["TRACK"]:
-        state.save_svg(
-            os.path.join(config["LOG_PATH"], config["EXP_NAME"], "vs_sl.svg")
-        )
-    """
-    # log = make_evaluate_log(log_info)
-    # pprint(log)
-    log_info, table_a_info, table_b_info = jax.jit(duplicate_evaluate)(params, rng)
-    print(make_evaluate_log(log_info))
-    print(table_a_info)
-    print(table_b_info)
-    # state.save_svg("svg/test_du.svg")
-    # state.save_svg("svg/test.svg")
-    # print(state)
-    log = jax.jit(make_evaluate_log)(log_info)
-    pprint(log)
-
-    if config["TRACK"]:
-        wandb.log(log)
