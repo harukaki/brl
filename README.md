@@ -20,9 +20,11 @@ Please download the "train.txt" and "test.txt" files, which are part of the data
 After downloading, place these files in your `your_data_directory`.  
 https://github.com/google-deepmind/open_spiel/blob/master/open_spiel/python/examples/bridge_supervised_learning.py
 
+Example  
+
 Run supervised learning
 ```bash
-python supervised_learning.py iterations=400000 train_batch=128 learning_rate=0.0001 \
+python sl.py iterations=400000 train_batch=128 learning_rate=0.0001 \
 eval_every=10000 data_path=your_data_directory save_path=your_model_directory
 ```
 
