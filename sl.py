@@ -33,7 +33,7 @@ NUM_PLAYERS = 4
 TOP_K_ACTIONS = 5  # How many alternative actions to display
 
 
-class supervisedLearningConfig(BaseModel):
+class SLConfig(BaseModel):
     """Configuration settings for supervised learning processes.
 
     Attributes:
@@ -63,7 +63,7 @@ class supervisedLearningConfig(BaseModel):
     type_of_model: Literal["DeepMind", "FAIR"] = "DeepMind"
     activation: str = "relu"
 
-args = supervisedLearningConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
+args = SLConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 
 
 def _no_play_trajectory(line: str):
