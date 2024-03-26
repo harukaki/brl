@@ -26,15 +26,7 @@ python supervised_learning.py iterations=400000 train_batch=128 learning_rate=0.
 eval_every=10000 data_path=your_data_directory save_path=your_model_directory
 ```
 
-Arguments
-```
-iterations     Number of epochs
-train_batch    Minibatche size
-learning_rate  Learning rate for Adam
-eval_every     Interval for evaluation and model saving
-data_path      Path to the directory where the training dataset is located
-save_path      Path to the directory where the trained model will be saved
-```
+
 ### 3. Reinforcement Learning
 Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.  
 For example, it is a model created with the above-mentioned supervised learning. 
