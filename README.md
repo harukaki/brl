@@ -16,7 +16,8 @@ download_dds_results()
 ```
 
 ### 2. Supervised Learning from Wbridge5 datasets
-Please download the "train.txt" and "test.txt" files, which are part of the dataset published by Openspiel, from the specified URL. After downloading, place these files in your `your_data_directory`.
+Please download the "train.txt" and "test.txt" files, which are part of the dataset published by Openspiel, from the specified URL.  
+After downloading, place these files in your `your_data_directory`.  
 https://github.com/google-deepmind/open_spiel/blob/master/open_spiel/python/examples/bridge_supervised_learning.py
 
 Run supervised learning
