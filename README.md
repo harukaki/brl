@@ -1,7 +1,7 @@
 # brl
 reinforcement learning for bridge
 ## Pre-trained models
-Parameters trained by this repository are published. For more details on each training, please refer to bridge_models/README in the repository.
+Parameters trained by this repository are published. 
 | Model                             | Description                                     | Score against wbridge5 |
 |-----------------------------------|-------------------------------------------------|------------------------|
 | model-sl.pkl                      | Supervised Learning from wbridge5               | -0.56 IMPs/b           |
@@ -9,6 +9,7 @@ Parameters trained by this repository are published. For more details on each tr
 | model-pretrained-rl.pkl           | RL after SL pretraining                         |  0.88 IMPs/b           |
 | model-pretrained-rl-with-fsp.pkl  | RL after SL pretraining with FSP                |  1.24 IMPs/b           |
 | model-pretrained-rl-with-pfsp.pkl | RL after SL pretraining with mix of SP and PFSP |  0.89 IMPs/b           |
+For more details on each training, please refer to bridge_models/README in the repository.
 ## Usage
 ### 1. Installation
 Please install the necessary packages according to the `requirements.txt`.  
