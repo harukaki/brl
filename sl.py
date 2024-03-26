@@ -34,22 +34,21 @@ TOP_K_ACTIONS = 5  # How many alternative actions to display
 
 
 class supervisedLearningConfig(BaseModel):
-    """
-    The supervisedLearningConfig class defines configuration settings for supervised learning processes.
+    """Configuration settings for supervised learning processes.
 
     Attributes:
-        iterations (int): Number of epochs, indicating how many times the model should learn from the entire training dataset.
-        train_batch (int): Size of minibatches for training. 
-        learning_rate (float): Learning rate for the Adam optimizer. 
-        eval_every (int): Interval for evaluation and model saving. 
-        data_path (str): Path to the directory where the training dataset is located. Used to load the dataset for training.
-        save_path (str): Path to the directory where the trained model will be saved. Specifies where the model checkpoints should be stored.
-        num_examples (int): Number of examples to visualize during evaluation
-        eval_batch (int): Batch size for evaluation.
-        rng_seed (int): Seed for the random number generator. Used to ensure reproducibility of the results.
-        entropy_coef (float): Coefficient for entropy regularization in the loss function.
-        type_of_model (Literal["DeepMind", "FAIR"]): Specifies the type of model to be used, indicating a choice between models proposed by DeepMind or FAIR.
-        activation (str): Specifies the activation function to be used, indicating a choice between 'relu' or 'tanh'.
+        iterations     Number of epochs, indicating how many times the model should learn from the entire training dataset.
+        train_batch    Size of minibatches for training. 
+        learning_rate  Learning rate for the Adam optimizer. 
+        eval_every     Interval for evaluation and model saving. 
+        data_path      Path to the directory where the training dataset is located. Used to load the dataset for training.
+        save_path      Path to the directory where the trained model will be saved. Specifies where the model checkpoints should be stored.
+        num_examples   Number of examples to visualize during evaluation
+        eval_batch     Batch size for evaluation.
+        rng_seed       Seed for the random number generator. Used to ensure reproducibility of the results.
+        entropy_coef   Coefficient for entropy regularization in the loss function.
+        type_of_model  Specifies the type of model to be used, indicating a choice between models proposed by DeepMind or FAIR.
+        activation     Specifies the activation function to be used, indicating a choice between 'relu' or 'tanh'.
     """
     iterations: int = 400000
     train_batch: int = 128
