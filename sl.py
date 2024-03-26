@@ -34,19 +34,35 @@ TOP_K_ACTIONS = 5  # How many alternative actions to display
 
 
 class supervisedLearningConfig(BaseModel):
+    """
+    The supervisedLearningConfig class defines configuration settings for supervised learning processes.
+
+    Attributes:
+        iterations (int): Number of epochs, indicating how many times the model should learn from the entire training dataset.
+        train_batch (int): Size of minibatches for training. 
+        learning_rate (float): Learning rate for the Adam optimizer. 
+        eval_every (int): Interval for evaluation and model saving. 
+        data_path (str): Path to the directory where the training dataset is located. Used to load the dataset for training.
+        save_path (str): Path to the directory where the trained model will be saved. Specifies where the model checkpoints should be stored.
+        num_examples (int): Number of examples to visualize during evaluation
+        eval_batch (int): Batch size for evaluation.
+        rng_seed (int): Seed for the random number generator. Used to ensure reproducibility of the results.
+        entropy_coef (float): Coefficient for entropy regularization in the loss function.
+        type_of_model (Literal["DeepMind", "FAIR"]): Specifies the type of model to be used, indicating a choice between models proposed by DeepMind or FAIR.
+        activation (str): Specifies the activation function to be used, indicating a choice between 'relu' or 'tanh'.
+    """
     iterations: int = 400000
-    data_path: str = None
-    eval_every: int = 10000
-    num_examples: int = 3
     train_batch: int = 128
+    learning_rate: float = 1e-4
+    eval_every: int = 10000
+    data_path: str = None
+    save_path: str = None
+    num_examples: int = 3
     eval_batch: int = 10000
     rng_seed: int = 42
-    save_path: str = None
-    learning_rate: float = 1e-4
     entropy_coef: float = 0
     type_of_model: Literal["DeepMind", "FAIR"] = "DeepMind"
     activation: str = "relu"
-
 
 args = supervisedLearningConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 
