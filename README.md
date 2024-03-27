@@ -57,8 +57,8 @@ python sl.py iterations=400000 train_batch=128 learning_rate=0.0001 \
 
 
 ## Reinforcement Learning
-Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.  
-For example, it is a model created with the above-mentioned supervised learning. 
+Please prepare a baseline model for evaluation and enter its file path in `EVAL_OPP_MODEL_PATH`.  
+For instance, the pre-trained model provided through supervised learning.  
 
 Examples  
   
@@ -67,18 +67,18 @@ Run reinforcement learning without loading initial model.
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
   TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=`bridge_models/model-sl.pkl` NUM_EVAL_STEP=10 \
   LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
 
 Run reinforcement learning with loading initial model.  
-Please prepare a initial model for the neural network and enter its file path in `your_initial_model_path`.  
-For example, it is a model created with the above-mentioned supervised learning.
+Please prepare a initial model for the neural network and enter its file path in `INITIAL_MODEL_PATH`.  
+For instance, the pre-trained model provided through supervised learning. 
 
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
   TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
-  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=your_initial_model_path \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=`bridge_models/model-sl.pkl` NUM_EVAL_STEP=10 \
+  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=`bridge_models/model-sl.pkl` \
   LOG_PATH="rl_log" EXP_NAME=exp0001 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
