@@ -24,7 +24,7 @@ Parameters trained by this repository are published.
 | model-pretrained-rl-with-fsp.pkl  | RL after SL pretraining with FSP                |  1.24 IMPs/b           |
 | model-pretrained-rl-with-pfsp.pkl | RL after SL pretraining with mix of SP and PFSP |  0.89 IMPs/b           |
 
-For more details on each training, please refer to `bridge_models/README`.
+For more details on each training, please refer to [`bridge_models/README`](https://github.com/harukaki/brl/tree/main/bridge_models).
 ## Evaluation models
 To evaluate pre-trained models against each other, please use the following command:  
 Example
