@@ -7,13 +7,25 @@ from pydantic import BaseModel
 
 
 class EVALConfig(BaseModel):
+    """
+    Configuration settings for evaluating models against each other.
+
+    Attributes:
+        team1_model_path    Path to the model for team1.
+        team2_model_path    Path to the model for team2.
+        team1_activation    Activation function for team1, either 'tanh' or 'relu'.
+        team1_model_type    Model type for team1, either 'DeepMind' or 'FAIR'.
+        team2_activation    Activation function for team2, either 'tanh' or 'relu'.
+        team2_model_type    Model type for team2, either 'DeepMind' or 'FAIR'.
+        num_eval_envs       Number of environments for evaluation.
+    """
     team1_model_path: str = None
     team2_model_path: str = None
     team1_activation: str = "relu"
     team1_model_type: str = "DeepMind"
     team2_activation: str = "relu"
     team2_model_type: str = "DeepMind"
-    num_eval_envs: str = 100
+    num_eval_envs: int = 100
 
 
 args = EVALConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
