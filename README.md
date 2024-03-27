@@ -1,5 +1,19 @@
 # brl
 reinforcement learning for bridge
+
+## Installation
+Please install the necessary packages according to the `requirements.txt`.  
+Note that you need to install the appropriate versions of jax and jaxlib according to your execution environment.  
+Additionally, we are using pgx as the environment for bridge, and currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx). 
+```bash
+pip install -r requirements.txt
+```
+For bridge bidding in pgx, downloading the Double Dummy Solver (DDS) dataset is required. Please download the DDS dataset according to [pgx bridge bidding documentation](https://github.com/sotetsuk/pgx/blob/main/docs/bridge_bidding.md).
+```py
+from pgx.bridge_bidding import download_dds_results
+download_dds_results()
+```
+
 ## Pre-trained models
 Parameters trained by this repository are published. 
 | Model                             | Description                                     | Score against wbridge5 |
@@ -27,21 +41,7 @@ bridge_models/model-pretrained-rl.pkl vs. bridge_models/model-pretrained-rl.pkl
 IMP: 0.47999998927116394 ± 0.5320970416069031
 ```
 
-## Usage
-### 1. Installation
-Please install the necessary packages according to the `requirements.txt`.  
-Note that you need to install the appropriate versions of jax and jaxlib according to your execution environment.  
-Additionally, we are using pgx as the environment for bridge, and currently, we support version 1.4.0 of [pgx](https://github.com/sotetsuk/pgx). 
-```bash
-pip install -r requirements.txt
-```
-For bridge bidding in pgx, downloading the Double Dummy Solver (DDS) dataset is required. Please download the DDS dataset according to [pgx bridge bidding documentation](https://github.com/sotetsuk/pgx/blob/main/docs/bridge_bidding.md).
-```py
-from pgx.bridge_bidding import download_dds_results
-download_dds_results()
-```
-
-### 2. Supervised Learning from Wbridge5 datasets
+## Supervised Learning from Wbridge5 datasets
 Please download the "train.txt" and "test.txt" files, which are part of the dataset published by Openspiel, from the specified URL.  
 After downloading, place these files in your `your_data_directory`.  
 https://github.com/google-deepmind/open_spiel/blob/master/open_spiel/python/examples/bridge_supervised_learning.py
@@ -55,7 +55,7 @@ eval_every=10000 data_path=your_data_directory save_path=your_model_directory
 ```
 
 
-### 3. Reinforcement Learning
+## Reinforcement Learning
 Please prepare a baseline model for evaluation and enter its file path in `your_baseline_model_path`.  
 For example, it is a model created with the above-mentioned supervised learning. 
 
