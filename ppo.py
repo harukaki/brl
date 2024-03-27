@@ -38,36 +38,80 @@ print(jax.local_devices())
 
 
 class PPOConfig(BaseModel):
-    """Configuration settings for PPO (Proximal Policy Optimization) training, evaluation, and logging.
+    """
+    Configuration settings for PPO (Proximal Policy Optimization) training, evaluation, and logging.
 
-    Attributes
-        # rollout settings
-        num_envs              Number of parallels for each actor rollout
-        num_steps             Number of steps for each actor rollout
-        minibatch_size        Minibatch size
-        total_timesteps       Number of steps experienced by the end of the training
+    Attributes:
+        seed                            Seed for random number generation.
+        lr                              Learning rate for Adam optimizer.
+        num_envs                        Number of parallel environments for actor rollout.
+        num_steps                       Number of steps per actor rollout.
+        total_timesteps                 Total number of steps by the end of training.
+        update_epochs                   Number of epochs for PPO update.
+        minibatch_size                  Minibatch size.
+        num_minibatches                 Number of minibatches per epoch.
+        num_updates                     Number of parameter updates until training concludes.
 
-        # ppo settings
-        update_epochs         Number of epochs for ppo update
-        lr                    Learning rate for Adam
-        gamma                 Discount factor gamma
-        gae_lambda            GAE lambda
-        clip_eps              Clip for ppo
-        ent_coef              Entropy coefficient
-        vf_coef               Value loss coefficient
+        # dataset config
+        dds_results_dir                 Path to the directory where dds_results are located.
+        hash_size                       Hash size for dds_results.
 
-        # evaluation settings
-        num_eval_envs         Number of parallels for evaluation
-        eval_opp_model_path   Path to the baseline model prepared for evaluation
-        num_eval_step         Interval for evaluation
+        # eval config
+        num_eval_envs                   Number of parallel environments for evaluation.
+        eval_opp_activation             Activation function of the opponent during evaluation.
+        eval_opp_model_type             Model type of the opponent during evaluation.
+        eval_opp_model_path             Path to the baseline model prepared for evaluation.
+        num_eval_step                   Interval for evaluation.
 
-        # other settings
-        load_initial_model    Whether to load a pretrained model as the initial values for the neural network
-        initial_model_path    Path to the initial model for the neural network
-        log_path              Path to the directory where training settings and trained models are saved
-        exp_name              Name of experiment
-        save_model            Whether to save the trained model
-        save_model_interval   Interval for saving the trained model
+        # log config
+        save_model                      Whether to save the trained model.
+        save_model_interval             Interval for saving the trained model.
+        log_path                        Path to the directory where training settings and trained models are saved.
+        exp_name                        Name of the experiment.
+        save_model_path                 Path to the directory where the trained model is saved.
+        track                           Whether to track training with wandb.
+
+        # actor config
+        load_initial_model              Whether to load a pretrained model as the initial values for the neural network.
+        initial_model_path              Path to the initial model for the neural network.
+        actor_activation                Activation function of the model being trained.
+        actor_model_type                Model type being trained.
+
+        # opposite config
+        game_mode                       Game mode for bridge, "competitive" or "free-run".
+        self_play                       Whether to engage in self-play.
+        opp_activation                  Activation function of the opponent during training, same as actor_activation if self-play is used.
+        opp_model_type                  Model type of the opponent during training, same as actor_model_type if self-play is used.
+        opp_model_path                  Model path of the opponent during training, not needed if self-play is used.
+        ratio_model_zoo                 Ratio from 0 to 1 for how often FSP is used in self-play.
+        num_model_zoo                   Maximum number of past models used for FSP.
+        threshold_model_zoo             Threshold for using a trained model in FSP, set to -24 to use all trained models.
+        prioritized_fictitious          Whether to use the improved method PFSP.
+        prior_t                         Softmax temperature parameter for sampling probability in PFSP.
+        num_prioritized_envs            Number of boards to play for calculating priority in PFSP.
+
+        # GAE config
+        gamma                           Discount factor gamma.
+        gae_lambda                      GAE lambda for advantage estimation.
+
+        # loss config
+        clip_eps                        Clipping epsilon for PPO.
+        ent_coef                        Entropy coefficient for exploration.
+        vf_coef                         Coefficient for value loss.
+
+        # PPO code optimization
+        value_clipping                  Whether to apply value clipping.
+        global_gradient_clipping        Whether to apply global gradient clipping.
+        anneal_lr                       Whether to anneal the learning rate.
+        reward_scaling                  Whether to scale rewards.
+        max_grad_norm                   Maximum norm for gradients.
+        reward_scale                    Hyperparameter for normalizing rewards.
+
+        # illegal action config
+        actor_illegal_action_mask       Whether to apply illegal action masking.
+        actor_illegal_action_penalty    Whether to apply a penalty for illegal actions.
+        illegal_action_penalty          Magnitude of penalty for illegal actions.
+        illegal_action_l2norm_coef      Coefficient for L2 norm to suppress output for illegal actions.
     """
 
     seed: int = 0
