@@ -25,8 +25,8 @@ def make_calc_gae(config, actor_forward_pass):
                     transition.value,
                     transition.reward,
                 )
-                delta = reward + config["GAMMA"] * next_value * (1 - done) - value
-                gae = delta + config["GAMMA"] * config["GAE_LAMBDA"] * (1 - done) * gae
+                delta = reward + config["gamma"] * next_value * (1 - done) - value
+                gae = delta + config["gamma"] * config["gae_lambda"] * (1 - done) * gae
                 return (gae, value), gae
 
             _, advantages = jax.lax.scan(

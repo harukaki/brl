@@ -39,101 +39,101 @@ print(jax.local_devices())
 
 class PPOConfig(BaseModel):
     """Configuration settings for PPO (Proximal Policy Optimization) training, evaluation, and logging.
-    
+
     Attributes
         # rollout settings
-        NUM_ENVS              Number of parallels for each actor rollout
-        NUM_STEPS             Number of steps for each actor rollout
-        MINIBATCH_SIZE        Minibatch size
-        TOTAL_TIMESTEPS       Number of steps experienced by the end of the training
+        num_envs              Number of parallels for each actor rollout
+        num_steps             Number of steps for each actor rollout
+        minibatch_size        Minibatch size
+        total_timesteps       Number of steps experienced by the end of the training
 
         # ppo settings
-        UPDATE_EPOCHS         Number of epochs for ppo update
-        LR                    Learning rate for Adam
-        GAMMA                 Discount factor gamma
-        GAE_LAMBDA            GAE lambda
-        CLIP_EPS              Clip for ppo
-        ENT_COEF              Entropy coefficient
-        VF_COEF               Value loss coefficient
+        update_epochs         Number of epochs for ppo update
+        lr                    Learning rate for Adam
+        gamma                 Discount factor gamma
+        gae_lambda            GAE lambda
+        clip_eps              Clip for ppo
+        ent_coef              Entropy coefficient
+        vf_coef               Value loss coefficient
 
         # evaluation settings
-        NUM_EVAL_ENVS         Number of parallels for evaluation
-        EVAL_OPP_MODEL_PATH   Path to the baseline model prepared for evaluation
-        NUM_EVAL_STEP         Interval for evaluation
+        num_eval_envs         Number of parallels for evaluation
+        eval_opp_model_path   Path to the baseline model prepared for evaluation
+        num_eval_step         Interval for evaluation
 
         # other settings
-        LOAD_INITIAL_MODEL    Whether to load a pretrained model as the initial values for the neural network
-        INITIAL_MODEL_PATH    Path to the initial model for the neural network
-        LOG_PATH              Path to the directory where training settings and trained models are saved
-        EXP_NAME              Name of experiment
-        SAVE_MODEL            Whether to save the trained model
-        SAVE_MODEL_INTERVAL   Interval for saving the trained model
+        load_initial_model    Whether to load a pretrained model as the initial values for the neural network
+        initial_model_path    Path to the initial model for the neural network
+        log_path              Path to the directory where training settings and trained models are saved
+        exp_name              Name of experiment
+        save_model            Whether to save the trained model
+        save_model_interval   Interval for saving the trained model
     """
-    SEED: int = 0
-    LR: float = 0.000001  
-    NUM_ENVS: int = 8192
-    NUM_STEPS: int = 32
-    TOTAL_TIMESTEPS: int = 2_621_440_000
-    UPDATE_EPOCHS: int = 10  
-    NUM_MINIBATCHES: int = 128
-    NUM_UPDATES: int = (
-        10000  
-    )
+
+    seed: int = 0
+    lr: float = 0.000001
+    num_envs: int = 8192
+    num_steps: int = 32
+    total_timesteps: int = 2_621_440_000
+    update_epochs: int = 10
+    minibatch_size: int = 1024
+    num_minibatches: int = 128
+    num_updates: int = 10000
     # dataset config
-    DDS_RESULTS_DIR: str = "dds_results"
-    HASH_SIZE: int = 100_000
+    dds_results_dir: str = "dds_results"
+    hash_size: int = 100_000
     # eval config
-    NUM_EVAL_ENVS: int = 10000
-    EVAL_OPP_ACTIVATION: str = "relu"
-    EVAL_OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
-    EVAL_OPP_MODEL_PATH: str = None
-    NUM_EVAL_STEP: int = 10
+    num_eval_envs: int = 10000
+    eval_opp_activation: str = "relu"
+    eval_opp_model_type: Literal["DeepMind", "FAIR"] = "DeepMind"
+    eval_opp_model_path: str = None
+    num_eval_step: int = 10
     # log config
-    SAVE_MODEL: bool = True
-    SAVE_MODEL_INTERVAL: int = 1
-    LOG_PATH: str = "rl_log"
-    EXP_NAME: str = "exp_0000"
-    MODEL_SAVE_PATH: str = "rl_params"
-    TRACK: bool = True
+    save_model: bool = True
+    save_model_interval: int = 1
+    log_path: str = "rl_log"
+    exp_name: str = "exp_0000"
+    save_model_path: str = "rl_params"
+    track: bool = True
 
     # actor config
-    LOAD_INITIAL_MODEL: bool = False
-    INITIAL_MODEL_PATH: str = None
-    ACTOR_ACTIVATION: str = "relu"
-    ACTOR_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
+    load_initial_model: bool = False
+    initial_model_path: str = None
+    actor_activation: str = "relu"
+    actor_model_type: Literal["DeepMind", "FAIR"] = "DeepMind"
     # opposite config
-    GAME_MODE: Literal["competitive", "free-run"] = "competitive"
-    SELF_PLAY: bool = True
-    OPP_ACTIVATION: str = "relu"
-    OPP_MODEL_TYPE: Literal["DeepMind", "FAIR"] = "DeepMind"
-    OPP_MODEL_PATH: str = None
-    MODEL_ZOO_RATIO: float = 0
-    MODEL_ZOO_NUM: int = 50_000
-    MODEL_ZOO_THRESHOLD: float = -24
-    PRIORITIZED_FICTITIOUS: bool = False
-    PRIOR_T: float = 1
-    NUM_PRIORITIZED_ENVS: int = 100
+    game_model: Literal["competitive", "free-run"] = "competitive"
+    self_play: bool = True
+    opp_activation: str = "relu"
+    opp_model_type: Literal["DeepMind", "FAIR"] = "DeepMind"
+    opp_model_path: str = None
+    ratio_model_zoo: float = 0
+    num_model_zoo: int = 50_000
+    threshold_model_zoo: float = -24
+    prioritized_fictitious: bool = False
+    prior_t: float = 1
+    num_prioritized_envs: int = 100
 
     # GAE config
-    GAMMA: float = 1
-    GAE_LAMBDA: float = 0.95
+    gamma: float = 1
+    gae_lambda: float = 0.95
     # loss config
-    CLIP_EPS: float = 0.2
-    ENT_COEF: float = 0.001
-    VF_COEF: float = 0.5
+    clip_eps: float = 0.2
+    ent_coef: float = 0.001
+    vf_coef: float = 0.5
     # PPO code optimaization
-    VALUE_CLIPPING: bool = True
-    GLOBAL_GRADIENT_CLIPPING: bool = True
-    ANNEAL_LR: bool = False  # True
-    REWARD_SCALING: bool = False
-    MAX_GRAD_NORM: float = 0.5
-    REWARD_SCALE: float = 7600
+    value_clipping: bool = True
+    global_gradient_clipping: bool = True
+    anneal_lr: bool = False  # True
+    reward_scaling: bool = False
+    max_grad_norm: float = 0.5
+    reward_scale: float = 7600
 
     # illegal action config
-    ACTOR_ILLEGAL_ACTION_MASK: bool = True
-    ACTOR_ILLEGAL_ACTION_PENALTY: bool = False
-    ILLEGAL_ACTION_PENALTY: float = -1
-    ILLEGAL_ACTION_L2NORM_COEF: float = 0
+    actor_illegal_action_mask: bool = True
+    actor_illegal_action_penalty: bool = False
+    illegal_action_penalty: float = -1
+    illegal_action_l2norm_coef: float = 0
 
 
 args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
@@ -142,29 +142,29 @@ args = PPOConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 def linear_schedule(count):
     frac = (
         1.0
-        - (count // (config["NUM_MINIBATCHES"] * config["UPDATE_EPOCHS"]))
-        / config["NUM_UPDATES"]
+        - (count // (config["num_minibatches"] * config["update_epochs"]))
+        / config["num_updates"]
     )
-    return config["LR"] * frac
+    return config["lr"] * frac
 
 
-if args.ANNEAL_LR:
-    if args.GLOBAL_GRADIENT_CLIPPING:
+if args.anneal_lr:
+    if args.global_gradient_clipping:
         optimizer = optax.chain(
-            optax.clip_by_global_norm(args.MAX_GRAD_NORM),
+            optax.clip_by_global_norm(args.max_grad_norm),
             optax.adam(learning_rate=linear_schedule, eps=1e-5),
         )
     else:
         optimizer = optax.adam(learning_rate=linear_schedule, eps=1e-5)
 
 else:
-    if args.GLOBAL_GRADIENT_CLIPPING:
+    if args.global_gradient_clipping:
         optimizer = optax.chain(
-            optax.clip_by_global_norm(args.MAX_GRAD_NORM),
-            optax.adam(args.LR, eps=1e-5),
+            optax.clip_by_global_norm(args.max_grad_norm),
+            optax.adam(args.lr, eps=1e-5),
         )
     else:
-        optimizer = optax.adam(args.LR, eps=1e-5)
+        optimizer = optax.adam(args.lr, eps=1e-5)
 
 
 class Transition(NamedTuple):
@@ -177,24 +177,20 @@ class Transition(NamedTuple):
     legal_action_mask: jnp.ndarray
 
 
-def _get(x, i):
-    return x[i]
-
-
 def train(config, rng):
-    config["NUM_UPDATES"] = (
-        config["TOTAL_TIMESTEPS"] // config["NUM_STEPS"] // config["NUM_ENVS"]
+    config["num_updates"] = (
+        config["total_timesteps"] // config["num_steps"] // config["num_envs"]
     )
-    config["NUM_MINIBATCHES"] = (
-        config["NUM_ENVS"] * config["NUM_STEPS"] // config["MINIBATCH_SIZE"]
+    config["num_minibatches"] = (
+        config["num_envs"] * config["num_steps"] // config["minibatch_size"]
     )
     if not os.path.isdir("dds_results"):
         download_dds_results()
     env = BridgeBidding()
 
     actor_forward_pass = make_forward_pass(
-        activation=config["ACTOR_ACTIVATION"],
-        model_type=config["ACTOR_MODEL_TYPE"],
+        activation=config["actor_activation"],
+        model_type=config["actor_model_type"],
     )
     # INIT NETWORK
     rng, _rng = jax.random.split(rng)
@@ -203,39 +199,39 @@ def train(config, rng):
     opt_state = optimizer.init(params=params)  # DONE
 
     # LOAD INITIAL MODEL
-    if config["LOAD_INITIAL_MODEL"]:
-        params = pickle.load(open(config["INITIAL_MODEL_PATH"], "rb"))
-        print(f"load initial params for actor: {config['INITIAL_MODEL_PATH']}")
+    if config["load_initial_model"]:
+        params = pickle.load(open(config["initial_model_path"], "rb"))
+        print(f"load initial params for actor: {config['initial_model_path']}")
 
     # MAKE EVAL
     rng, eval_rng = jax.random.split(rng)
     eval_env = BridgeBidding("dds_results/test_000.npy")
     simple_evaluate = make_simple_evaluate(
         eval_env=eval_env,
-        team1_activation=config["ACTOR_ACTIVATION"],
-        team1_model_type=config["ACTOR_MODEL_TYPE"],
-        team2_activation=config["EVAL_OPP_ACTIVATION"],
-        team2_model_type=config["EVAL_OPP_MODEL_TYPE"],
-        team2_model_path=config["EVAL_OPP_MODEL_PATH"],
-        num_eval_envs=config["NUM_EVAL_ENVS"],
+        team1_activation=config["actor_activation"],
+        team1_model_type=config["actor_model_type"],
+        team2_activation=config["eval_opp_activation"],
+        team2_model_type=config["eval_opp_model_type"],
+        team2_model_path=config["eval_opp_model_path"],
+        num_eval_envs=config["num_eval_envs"],
     )
     simple_duplicate_evaluate = make_simple_duplicate_evaluate(
         eval_env=eval_env,
-        team1_activation=config["ACTOR_ACTIVATION"],
-        team1_model_type=config["ACTOR_MODEL_TYPE"],
-        team2_activation=config["ACTOR_ACTIVATION"],
-        team2_model_type=config["ACTOR_MODEL_TYPE"],
-        num_eval_envs=config["NUM_PRIORITIZED_ENVS"],
+        team1_activation=config["actor_activation"],
+        team1_model_type=config["actor_model_type"],
+        team2_activation=config["actor_activation"],
+        team2_model_type=config["actor_model_type"],
+        num_eval_envs=config["num_prioritized_envs"],
     )
     duplicate_evaluate = make_evaluate(
         eval_env=eval_env,
-        team1_activation=config["ACTOR_ACTIVATION"],
-        team1_model_type=config["ACTOR_MODEL_TYPE"],
-        team2_activation=config["EVAL_OPP_ACTIVATION"],
-        team2_model_type=config["EVAL_OPP_MODEL_TYPE"],
-        team2_model_path=config["EVAL_OPP_MODEL_PATH"],
-        num_eval_envs=config["NUM_EVAL_ENVS"],
-        game_mode=config["GAME_MODE"],
+        team1_activation=config["actor_activation"],
+        team1_model_type=config["actor_model_type"],
+        team2_activation=config["eval_opp_activation"],
+        team2_model_type=config["eval_opp_model_type"],
+        team2_model_path=config["eval_opp_model_path"],
+        num_eval_envs=config["num_eval_envs"],
+        game_mode=config["game_model"],
         duplicate=True,
     )
     jit_simple_evaluate = jax.jit(simple_evaluate)
@@ -246,8 +242,8 @@ def train(config, rng):
     # INIT UPDATE FUNCTION
 
     opp_forward_pass = make_forward_pass(
-        activation=config["OPP_ACTIVATION"],
-        model_type=config["OPP_MODEL_TYPE"],
+        activation=config["opp_activation"],
+        model_type=config["opp_model_type"],
     )
 
     # INIT ENV
@@ -255,12 +251,12 @@ def train(config, rng):
     init_list = []
     roll_out_list = []
     train_dds_results_list = sorted(
-        [path for path in os.listdir(config["DDS_RESULTS_DIR"]) if "train" in path]
+        [path for path in os.listdir(config["dds_results_dir"]) if "train" in path]
     )
 
     # dds_resultsの異なるhash tableをloadしたenvを用意
     for file in train_dds_results_list:
-        env = BridgeBidding(os.path.join(config["DDS_RESULTS_DIR"], file))
+        env = BridgeBidding(os.path.join(config["dds_results_dir"], file))
         env_list.append(env)
         init_list.append(jax.jit(jax.vmap(env.init)))
         roll_out_list.append(
@@ -272,7 +268,7 @@ def train(config, rng):
     )
 
     rng, _rng = jax.random.split(rng)
-    reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
+    reset_rng = jax.random.split(_rng, config["num_envs"])
     init = init_list[0]
     roll_out = roll_out_list[0]
     env_state = init(reset_rng)
@@ -292,28 +288,29 @@ def train(config, rng):
         _rng,
     )  # DONE
 
-    if not config["SELF_PLAY"]:
-        opp_params = pickle.load(open(config["EVAL_OPP_MODEL_PATH"], "rb"))
+    if not config["self_play"]:
+        opp_params = pickle.load(open(config["eval_opp_model_path"], "rb"))
     else:
         opp_params = params
-    if config["SAVE_MODEL"]:
+    if config["save_model"]:
         os.mkdir(
             os.path.join(
-                config["LOG_PATH"],
-                config["EXP_NAME"],
-                config["MODEL_SAVE_PATH"],
+                config["log_path"],
+                config["exp_name"],
+                config["save_model_path"],
             )
         )
-
-    for i in range(config["NUM_UPDATES"]):
+    print("start training")
+    for i in range(config["num_updates"]):
+        print(f"--------------iteration {i}---------------")
         # save model
-        if (i != 0) and (i % config["SAVE_MODEL_INTERVAL"] == 0):
-            if config["SAVE_MODEL"]:
+        if (i != 0) and (i % config["save_model_interval"] == 0):
+            if config["save_model"]:
                 with open(
                     os.path.join(
-                        config["LOG_PATH"],
-                        config["EXP_NAME"],
-                        config["MODEL_SAVE_PATH"],
+                        config["log_path"],
+                        config["exp_name"],
+                        config["save_model_path"],
                         f"params-{i:08}.pkl",
                     ),
                     "wb",
@@ -325,37 +322,37 @@ def train(config, rng):
         R = jit_simple_evaluate(runner_state[0], eval_rng)
         time_eval_end = time.time()
         print(f"eval time: {time_eval_end-time_eval_sta}")
-        if i % config["NUM_EVAL_STEP"] == 0:
+        if i % config["num_eval_step"] == 0:
             time_du_sta = time.time()
             log_info, _, _ = jit_diplicate_evaluate(runner_state[0], eval_rng)
             eval_log = jit_make_evaluate_log(log_info)
             time_du_end = time.time()
             print(f"duplicate eval time: {time_du_end-time_du_sta}")
 
-        if config["SELF_PLAY"]:
+        if config["self_play"]:
             (imp_opp, _, _), _, _ = jit_simple_duplicate_evaluate(
                 team1_params=runner_state[0],
                 team2_params=opp_params,
                 rng_key=eval_rng,
             )
-            if imp_opp >= config["MODEL_ZOO_THRESHOLD"]:
+            if imp_opp >= config["threshold_model_zoo"]:
                 params_list = sorted(
                     [
                         path
                         for path in os.listdir(
                             os.path.join(
-                                config["LOG_PATH"],
-                                config["EXP_NAME"],
-                                config["MODEL_SAVE_PATH"],
+                                config["log_path"],
+                                config["exp_name"],
+                                config["save_model_path"],
                             )
                         )
                         if "params" in path
                     ]
                 )
                 if (len(params_list) != 0) and np.random.binomial(
-                    size=1, n=1, p=config["MODEL_ZOO_RATIO"]
+                    size=1, n=1, p=config["ratio_model_zoo"]
                 ):
-                    if config["PRIORITIZED_FICTITIOUS"]:
+                    if config["prioritized_fictitious"]:
                         league_sta = time.time()
                         win_rate_list = np.zeros(len(params_list))
                         imp_list = np.zeros(len(params_list))
@@ -364,9 +361,9 @@ def train(config, rng):
                             team2_params = pickle.load(
                                 open(
                                     os.path.join(
-                                        config["LOG_PATH"],
-                                        config["EXP_NAME"],
-                                        config["MODEL_SAVE_PATH"],
+                                        config["log_path"],
+                                        config["exp_name"],
+                                        config["save_model_path"],
                                         params_list[i],
                                     ),
                                     "rb",
@@ -385,7 +382,7 @@ def train(config, rng):
                         def softmax(x):
                             exp_values = np.exp(
                                 (x - np.max(x, axis=-1, keepdims=True))
-                                / config["PRIOR_T"]
+                                / config["prior_t"]
                             )
                             probabilities = exp_values / np.sum(
                                 exp_values, axis=-1, keepdims=True
@@ -403,9 +400,9 @@ def train(config, rng):
                     opp_params = pickle.load(
                         open(
                             os.path.join(
-                                config["LOG_PATH"],
-                                config["EXP_NAME"],
-                                config["MODEL_SAVE_PATH"],
+                                config["log_path"],
+                                config["exp_name"],
+                                config["save_model_path"],
                                 params_path,
                             ),
                             "rb",
@@ -445,7 +442,7 @@ def train(config, rng):
         print(f"rollout time: {time2 - time1}")
         print(f"calc gae time: {time3 - time2}")
         print(f"update time: {time4 - time3}")
-        steps += config["NUM_ENVS"] * config["NUM_STEPS"]
+        steps += config["num_envs"] * config["num_steps"]
 
         total_loss, (
             value_loss,
@@ -468,7 +465,7 @@ def train(config, rng):
             "train/approx_kl": float(approx_kl[-1][-1]),
             "train/lr": float(
                 linear_schedule(
-                    (i + 1) * config["UPDATE_EPOCHS"] * config["NUM_MINIBATCHES"]
+                    (i + 1) * config["update_epochs"] * config["num_minibatches"]
                 )
             ),
             "train/imp_opp_before": float(imp_opp_before),
@@ -477,11 +474,11 @@ def train(config, rng):
             "steps": steps,
         }
         pprint(log)
-        if i % config["NUM_EVAL_STEP"] == 0:
+        if i % config["num_eval_step"] == 0:
             log = {**log, **eval_log}
-        if config["TRACK"]:
+        if config["track"]:
             wandb.log(log)
-        if (runner_state[4] - board_count) // config["HASH_SIZE"] >= 1:
+        if (runner_state[4] - board_count) // config["hash_size"] >= 1:
             hash_index += 1
             print(f"board count: {runner_state[4] - board_count}")
             board_count = runner_state[4]
@@ -495,7 +492,7 @@ def train(config, rng):
             init = init_list[hash_index_list[hash_index]]
             roll_out = roll_out_list[hash_index_list[hash_index]]
             rng, _rng = jax.random.split(rng)
-            reset_rng = jax.random.split(_rng, config["NUM_ENVS"])
+            reset_rng = jax.random.split(_rng, config["num_envs"])
 
             env_state = init(reset_rng)
             runner_state = (
@@ -506,12 +503,12 @@ def train(config, rng):
                 runner_state[4],
                 _rng,
             )
-    if config["SAVE_MODEL"]:
+    if config["save_model"]:
         with open(
             os.path.join(
-                config["LOG_PATH"],
-                config["EXP_NAME"],
-                config["MODEL_SAVE_PATH"],
+                config["log_path"],
+                config["exp_name"],
+                config["save_model_path"],
                 f"params-{i + 1:08}.pkl",
             ),
             "wb",
@@ -519,9 +516,9 @@ def train(config, rng):
             pickle.dump(runner_state[0], writer)
         with open(
             os.path.join(
-                config["LOG_PATH"],
-                config["EXP_NAME"],
-                config["MODEL_SAVE_PATH"],
+                config["log_path"],
+                config["exp_name"],
+                config["save_model_path"],
                 f"opt_state-{i + 1:08}.pkl",
             ),
             "wb",
@@ -533,66 +530,66 @@ def train(config, rng):
 
 if __name__ == "__main__":
     config = {
-        "LR": args.LR,
-        "NUM_ENVS": args.NUM_ENVS,
-        "NUM_STEPS": args.NUM_STEPS,
-        "TOTAL_TIMESTEPS": args.TOTAL_TIMESTEPS,
-        "UPDATE_EPOCHS": args.UPDATE_EPOCHS,
-        "MINIBATCH_SIZE": args.MINIBATCH_SIZE,
-        "GAMMA": args.GAMMA,
-        "GAE_LAMBDA": args.GAE_LAMBDA,
-        "CLIP_EPS": args.CLIP_EPS,
-        "ENT_COEF": args.ENT_COEF,
-        "VF_COEF": args.VF_COEF,
-        "MAX_GRAD_NORM": args.MAX_GRAD_NORM,
-        "ANNEAL_LR": True,
-        "NUM_EVAL_ENVS": args.NUM_EVAL_ENVS,
-        "DDS_RESULTS_DIR": args.DDS_RESULTS_DIR,
-        "HASH_SIZE": args.HASH_SIZE,
-        "REWARD_SCALE": args.REWARD_SCALE,
-        "ACTOR_ACTIVATION": args.ACTOR_ACTIVATION,
-        "ACTOR_MODEL_TYPE": args.ACTOR_MODEL_TYPE,
-        "OPP_ACTIVATION": args.OPP_ACTIVATION,
-        "OPP_MODEL_TYPE": args.OPP_MODEL_TYPE,
-        "OPP_MODEL_PATH": args.OPP_MODEL_PATH,
-        "LOAD_INITIAL_MODEL": args.LOAD_INITIAL_MODEL,
-        "INITIAL_MODEL_PATH": args.INITIAL_MODEL_PATH,
-        "SAVE_MODEL": args.SAVE_MODEL,
-        "SAVE_MODEL_INTERVAL": args.SAVE_MODEL_INTERVAL,
-        "MODEL_SAVE_PATH": args.MODEL_SAVE_PATH,
-        "LOG_PATH": args.LOG_PATH,
-        "EXP_NAME": args.EXP_NAME,
-        "TRACK": args.TRACK,
-        "ACTOR_ILLEGAL_ACTION_MASK": args.ACTOR_ILLEGAL_ACTION_MASK,
-        "ACTOR_ILLEGAL_ACTION_PENALTY": args.ACTOR_ILLEGAL_ACTION_PENALTY,
-        "ILLEGAL_ACTION_L2NORM_COEF": args.ILLEGAL_ACTION_L2NORM_COEF,
-        "GAME_MODE": args.GAME_MODE,
-        "REWARD_SCALING": args.REWARD_SCALING,
-        "SEED": args.SEED,
-        "SELF_PLAY": args.SELF_PLAY,
-        "MODEL_ZOO_RATIO": args.MODEL_ZOO_RATIO,
-        "MODEL_ZOO_THRESHOLD": args.MODEL_ZOO_THRESHOLD,
-        "PRIORITIZED_FICTITIOUS": args.PRIORITIZED_FICTITIOUS,
-        "PRIOR_T": args.PRIOR_T,
-        "NUM_PRIORITIZED_ENVS": args.NUM_PRIORITIZED_ENVS,
-        "MODEL_ZOO_NUM": args.MODEL_ZOO_NUM,
-        "EVAL_OPP_ACTIVATION": args.EVAL_OPP_ACTIVATION,
-        "EVAL_OPP_MODEL_TYPE": args.EVAL_OPP_MODEL_TYPE,
-        "EVAL_OPP_MODEL_PATH": args.EVAL_OPP_MODEL_PATH,
-        "NUM_EVAL_STEP": args.NUM_EVAL_STEP,
-        "VALUE_CLIPPING": args.VALUE_CLIPPING,
-        "GLOBAL_GRADIENT_CLIPPING": args.GLOBAL_GRADIENT_CLIPPING,
+        "lr": args.lr,
+        "num_envs": args.num_envs,
+        "num_steps": args.num_steps,
+        "total_timesteps": args.total_timesteps,
+        "update_epochs": args.update_epochs,
+        "minibatch_size": args.minibatch_size,
+        "gamma": args.gamma,
+        "gae_lambda": args.gae_lambda,
+        "clip_eps": args.clip_eps,
+        "ent_coef": args.ent_coef,
+        "vf_coef": args.vf_coef,
+        "max_grad_norm": args.max_grad_norm,
+        "anneal_lr": True,
+        "num_eval_envs": args.num_eval_envs,
+        "dds_results_dir": args.dds_results_dir,
+        "hash_size": args.hash_size,
+        "reward_scale": args.reward_scale,
+        "actor_activation": args.actor_activation,
+        "actor_model_type": args.actor_model_type,
+        "opp_activation": args.opp_activation,
+        "opp_model_type": args.opp_model_type,
+        "opp_model_path": args.opp_model_path,
+        "load_initial_model": args.load_initial_model,
+        "initial_model_path": args.initial_model_path,
+        "save_model": args.save_model,
+        "save_model_interval": args.save_model_interval,
+        "save_model_path": args.save_model_path,
+        "log_path": args.log_path,
+        "exp_name": args.exp_name,
+        "track": args.track,
+        "actor_illegal_action_mask": args.actor_illegal_action_mask,
+        "actor_illegal_action_penalty": args.actor_illegal_action_penalty,
+        "illegal_action_l2norm_coef": args.illegal_action_l2norm_coef,
+        "game_model": args.game_model,
+        "reward_scaling": args.reward_scaling,
+        "seed": args.seed,
+        "self_play": args.self_play,
+        "ratio_model_zoo": args.ratio_model_zoo,
+        "threshold_model_zoo": args.threshold_model_zoo,
+        "prioritized_fictitious": args.prioritized_fictitious,
+        "prior_t": args.prior_t,
+        "num_prioritized_envs": args.num_prioritized_envs,
+        "num_model_zoo": args.num_model_zoo,
+        "eval_opp_activation": args.eval_opp_activation,
+        "eval_opp_model_type": args.eval_opp_model_type,
+        "eval_opp_model_path": args.eval_opp_model_path,
+        "num_eval_step": args.num_eval_step,
+        "value_clipping": args.value_clipping,
+        "global_gradient_clipping": args.global_gradient_clipping,
     }
-    if args.TRACK:
+    if args.track:
         wandb.init(
             project="ppo-bridge",
-            name=args.EXP_NAME,
+            name=args.exp_name,
             config=args.model_dump(),
             save_code=True,
         )
-        os.mkdir(os.path.join(config["LOG_PATH"], config["EXP_NAME"]))
+        os.mkdir(os.path.join(config["log_path"], config["exp_name"]))
         config_file = open(
-            os.path.join(config["LOG_PATH"], config["EXP_NAME"], "config.json"),
+            os.path.join(config["log_path"], config["exp_name"], "config.json"),
             mode="w",
         )
         json.dump(
@@ -603,7 +600,7 @@ if __name__ == "__main__":
         )
         config_file.close()
     pprint(config)
-    rng = jax.random.PRNGKey(config["SEED"])
+    rng = jax.random.PRNGKey(config["seed"])
     sta = time.time()
     out = train(config, rng)
     end = time.time()

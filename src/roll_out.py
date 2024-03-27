@@ -22,7 +22,7 @@ class Transition(NamedTuple):
 
 def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
     def make_policy(config):
-        if config["ACTOR_ILLEGAL_ACTION_MASK"]:
+        if config["actor_illegal_action_mask"]:
 
             def masked_policy(mask, logits):
                 logits = logits + jnp.finfo(np.float64).min * (~mask)
@@ -30,7 +30,7 @@ def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
                 return pi
 
             return masked_policy
-        elif config["ACTOR_ILLEGAL_ACTION_PENALTY"]:
+        elif config["actor_illegal_action_penalty"]:
 
             def no_masked_policy(mask, logits):
                 pi = distrax.Categorical(logits=logits)
@@ -38,9 +38,9 @@ def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
 
             return no_masked_policy
 
-    if config["GAME_MODE"] == "competitive":
+    if config["game_model"] == "competitive":
         make_step_fn = single_play_step_two_policy_commpetitive
-    elif config["GAME_MODE"] == "free-run":
+    elif config["game_model"] == "free-run":
         make_step_fn = single_play_step_free_run
         opp_forward_pass = None
         opp_params = None
@@ -87,7 +87,7 @@ def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
                 env_state.terminated,
                 action,
                 value,
-                jax.vmap(get_fn)(env_state.rewards / config["REWARD_SCALE"], actor),
+                jax.vmap(get_fn)(env_state.rewards / config["reward_scale"], actor),
                 log_prob,
                 last_obs,
                 mask,
@@ -103,7 +103,7 @@ def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
             return runner_state, transition
 
         runner_state, traj_batch = jax.lax.scan(
-            _env_step, runner_state, None, config["NUM_STEPS"]
+            _env_step, runner_state, None, config["num_steps"]
         )
         return runner_state, traj_batch
 

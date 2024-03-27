@@ -3,6 +3,7 @@
   https://github.com/google-deepmind/open_spiel
 
 Please refer to their work if you use this example in your research."""
+
 import os
 import pickle
 from typing import Any
@@ -38,9 +39,9 @@ class SLConfig(BaseModel):
 
     Attributes:
         iterations     Number of epochs, indicating how many times the model should learn from the entire training dataset.
-        train_batch    Size of minibatches for training. 
-        learning_rate  Learning rate for the Adam optimizer. 
-        eval_every     Interval for evaluation and model saving. 
+        train_batch    Size of minibatches for training.
+        learning_rate  Learning rate for the Adam optimizer.
+        eval_every     Interval for evaluation and model saving.
         data_path      Path to the directory where the training dataset is located. Used to load the dataset for training.
         save_path      Path to the directory where the trained model will be saved. Specifies where the model checkpoints should be stored.
         num_examples   Number of examples to visualize during evaluation
@@ -50,6 +51,7 @@ class SLConfig(BaseModel):
         type_of_model  Specifies the type of model to be used, indicating a choice between models proposed by DeepMind or FAIR.
         activation     Specifies the activation function to be used, indicating a choice between 'relu' or 'tanh'.
     """
+
     iterations: int = 400000
     train_batch: int = 128
     learning_rate: float = 1e-4
@@ -62,6 +64,7 @@ class SLConfig(BaseModel):
     entropy_coef: float = 0
     type_of_model: Literal["DeepMind", "FAIR"] = "DeepMind"
     activation: str = "relu"
+
 
 args = SLConfig(**OmegaConf.to_object(OmegaConf.from_cli()))
 

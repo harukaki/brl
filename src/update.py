@@ -8,7 +8,7 @@ from .models import make_forward_pass
 
 def make_update_step(config, actor_forward_pass, optimizer):
     def make_policy(config):
-        if config["ACTOR_ILLEGAL_ACTION_MASK"]:
+        if config["actor_illegal_action_mask"]:
 
             def masked_policy(mask, logits):
                 logits = logits + jnp.finfo(np.float64).min * (~mask)
@@ -16,7 +16,7 @@ def make_update_step(config, actor_forward_pass, optimizer):
                 return pi
 
             return masked_policy
-        elif config["ACTOR_ILLEGAL_ACTION_PENALTY"]:
+        elif config["actor_illegal_action_penalty"]:
 
             def no_masked_policy(mask, logits):
                 pi = distrax.Categorical(logits=logits)
@@ -30,7 +30,7 @@ def make_update_step(config, actor_forward_pass, optimizer):
         return x[i]
 
     def make_reward_scaling(config):
-        if config["REWARD_SCALING"]:
+        if config["reward_scaling"]:
 
             def reward_scaling(gae):
                 return (gae - gae.mean()) / (gae.std() + 1e-8)
@@ -47,11 +47,11 @@ def make_update_step(config, actor_forward_pass, optimizer):
     reward_scaling = make_reward_scaling(config)
 
     def make_value_loss_fn(config):
-        if config["VALUE_CLIPPING"]:
+        if config["value_clipping"]:
 
             def clipped_value_loss_fn(value, traj_batch, targets):
                 value_pred_clipped = traj_batch.value + (value - traj_batch.value).clip(
-                    -config["CLIP_EPS"], config["CLIP_EPS"]
+                    -config["clip_eps"], config["clip_eps"]
                 )
                 value_losses = jnp.square(value - targets)
                 value_losses_clipped = jnp.square(value_pred_clipped - targets)
@@ -103,7 +103,7 @@ def make_update_step(config, actor_forward_pass, optimizer):
                     """
                     value_pred_clipped = traj_batch.value + (
                         value - traj_batch.value
-                    ).clip(-config["CLIP_EPS"], config["CLIP_EPS"])
+                    ).clip(-config["clip_eps"], config["clip_eps"])
                     value_losses = jnp.square(value - targets)
                     value_losses_clipped = jnp.square(value_pred_clipped - targets)
                     value_loss = (
@@ -121,8 +121,8 @@ def make_update_step(config, actor_forward_pass, optimizer):
                     loss_actor2 = (
                         jnp.clip(
                             ratio,
-                            1.0 - config["CLIP_EPS"],
-                            1.0 + config["CLIP_EPS"],
+                            1.0 - config["clip_eps"],
+                            1.0 + config["clip_eps"],
                         )
                         * gae
                     )
@@ -145,16 +145,16 @@ def make_update_step(config, actor_forward_pass, optimizer):
 
                     total_loss = (
                         loss_actor
-                        + config["VF_COEF"] * value_loss
-                        - config["ENT_COEF"] * entropy
-                        + config["ILLEGAL_ACTION_L2NORM_COEF"] * illegal_action_loss
+                        + config["vf_coef"] * value_loss
+                        - config["ent_coef"] * entropy
+                        + config["illegal_action_l2norm_coef"] * illegal_action_loss
                     )
                     """
-                    total_loss = -config["ENT_COEF"] * entropy
+                    total_loss = -config["ent_coef"] * entropy
                     """
                     approx_kl = ((ratio - 1) - logratio).mean()
                     clipflacs = jnp.float32(
-                        jnp.abs((ratio - 1.0)) > config["CLIP_EPS"]
+                        jnp.abs((ratio - 1.0)) > config["clip_eps"]
                     ).mean()
 
                     return total_loss, (
@@ -186,9 +186,9 @@ def make_update_step(config, actor_forward_pass, optimizer):
                 rng,
             ) = update_state  # DONE
             rng, _rng = jax.random.split(rng)
-            batch_size = config["MINIBATCH_SIZE"] * config["NUM_MINIBATCHES"]
+            batch_size = config["minibatch_size"] * config["num_minibatches"]
             assert (
-                batch_size == config["NUM_STEPS"] * config["NUM_ENVS"]
+                batch_size == config["num_steps"] * config["num_envs"]
             ), "batch size must be equal to number of steps * number of envs"
             permutation = jax.random.permutation(_rng, batch_size)
             batch = (traj_batch, advantages, targets)
@@ -200,7 +200,7 @@ def make_update_step(config, actor_forward_pass, optimizer):
             )
             minibatches = jax.tree_util.tree_map(
                 lambda x: jnp.reshape(
-                    x, [config["NUM_MINIBATCHES"], -1] + list(x.shape[1:])
+                    x, [config["num_minibatches"], -1] + list(x.shape[1:])
                 ),
                 shuffled_batch,
             )
@@ -226,7 +226,7 @@ def make_update_step(config, actor_forward_pass, optimizer):
             rng,
         )  # DONE
         update_state, loss_info = jax.lax.scan(
-            _update_epoch, update_state, None, config["UPDATE_EPOCHS"]
+            _update_epoch, update_state, None, config["update_epochs"]
         )
         # print(loss_info)
         params, opt_state, _, _, _, rng = update_state  # DONE

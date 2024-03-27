@@ -57,7 +57,7 @@ python sl.py iterations=400000 train_batch=128 learning_rate=0.0001 \
 
 
 ## Reinforcement Learning
-Please prepare a baseline model for evaluation and enter its file path in `EVAL_OPP_MODEL_PATH`.  
+Please prepare a baseline model for evaluation and enter its file path in `eval_opp_model_path`.  
 For instance, the pre-trained model provided through supervised learning.  
 
 Examples  
@@ -65,20 +65,20 @@ Examples
 Run reinforcement learning without loading initial model.
 
 ```bash
-python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
-  TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH="bridge_models/model-sl.pkl" NUM_EVAL_STEP=10 \
-  LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
+python ppo.py num_envs=8192 num_steps=32 MINIBATCHE_SIZE=1024 \
+  total_timesteps=5242880000 update_epochs=10 lr=0.00001 gamma=1 gae_lambda=0.95 ent_coef=0.001 \
+  VE_COEF=0.5 num_eval_envs=100 eval_opp_model_path="bridge_models/model-sl.pkl" num_eval_step=10 \
+  load_initial_model=False log_path="rl_log" exp_name=exp0000 save_model=True save_model_interval=100
 ```
 
 Run reinforcement learning with loading initial model.  
-Please prepare a initial model for the neural network and enter its file path in `INITIAL_MODEL_PATH`.  
+Please prepare a initial model for the neural network and enter its file path in `initial_model_path`.  
 For instance, the pre-trained model provided through supervised learning. 
 
 ```bash
-python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
-  TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH="bridge_models/model-sl.pkl" NUM_EVAL_STEP=10 \
-  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH="bridge_models/model-sl.pkl" \
-  LOG_PATH="rl_log" EXP_NAME=exp0001 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
+python ppo.py num_envs=8192 num_steps=32 MINIBATCHE_SIZE=1024 \
+  total_timesteps=2621440000 update_epochs=10 lr=0.000001 gamma=1 gae_lambda=0.95 ent_coef=0.001 \
+  VE_COEF=0.5 num_eval_envs=100 eval_opp_model_path="bridge_models/model-sl.pkl" num_eval_step=10 \
+  load_initial_model=True initial_model_path="bridge_models/model-sl.pkl" \
+  log_path="rl_log" exp_name=exp0001 save_model=True save_model_interval=100
 ```
