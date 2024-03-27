@@ -65,7 +65,7 @@ Examples
 Run reinforcement learning without loading initial model.
 
 ```bash
-python ppo.py num_envs=8192 num_steps=32 MINIBATCHE_SIZE=1024 \
+python ppo.py num_envs=8192 num_steps=32 minibatch_size=1024 \
   total_timesteps=5242880000 update_epochs=10 lr=0.00001 gamma=1 gae_lambda=0.95 ent_coef=0.001 \
   VE_COEF=0.5 num_eval_envs=100 eval_opp_model_path="bridge_models/model-sl.pkl" num_eval_step=10 \
   load_initial_model=False log_path="rl_log" exp_name=exp0000 save_model=True save_model_interval=100
@@ -76,7 +76,7 @@ Please prepare a initial model for the neural network and enter its file path in
 For instance, the pre-trained model provided through supervised learning. 
 
 ```bash
-python ppo.py num_envs=8192 num_steps=32 MINIBATCHE_SIZE=1024 \
+python ppo.py num_envs=8192 num_steps=32 minibatch_size=1024 \
   total_timesteps=2621440000 update_epochs=10 lr=0.000001 gamma=1 gae_lambda=0.95 ent_coef=0.001 \
   VE_COEF=0.5 num_eval_envs=100 eval_opp_model_path="bridge_models/model-sl.pkl" num_eval_step=10 \
   load_initial_model=True initial_model_path="bridge_models/model-sl.pkl" \
