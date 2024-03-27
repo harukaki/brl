@@ -29,7 +29,8 @@ For more details on each training, please refer to `bridge_models/README`.
 To evaluate pre-trained models against each other, please use the following command:  
 Example
 ```bash
-python eval.py team1_model_path=bridge_models/model-pretrained-rl.pkl team2_model_path=bridge_models/model-sl.pkl num_eval_envs=100
+python eval.py team1_model_path=bridge_models/model-pretrained-rl.pkl \
+  team2_model_path=bridge_models/model-sl.pkl num_eval_envs=100
 ```
 
 Here's an example of the output:
@@ -51,7 +52,7 @@ Example
 Run supervised learning
 ```bash
 python sl.py iterations=400000 train_batch=128 learning_rate=0.0001 \
-eval_every=10000 data_path=your_data_directory save_path=your_model_directory
+  eval_every=10000 data_path=your_data_directory save_path=your_model_directory
 ```
 
 
@@ -65,9 +66,9 @@ Run reinforcement learning without loading initial model.
 
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
-TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
-LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
+  TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
+  LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
 
 Run reinforcement learning with loading initial model.  
@@ -76,8 +77,8 @@ For example, it is a model created with the above-mentioned supervised learning.
 
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
-TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
-LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=your_initial_model_path \
-LOG_PATH="rl_log" EXP_NAME=exp0001 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
+  TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=your_baseline_model_path NUM_EVAL_STEP=10 \
+  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=your_initial_model_path \
+  LOG_PATH="rl_log" EXP_NAME=exp0001 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
