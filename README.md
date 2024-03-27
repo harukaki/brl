@@ -67,7 +67,7 @@ Run reinforcement learning without loading initial model.
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
   TOTAL_TIMESTEPS=5242880000 UPDATE_EPOCHS=10 LR=0.00001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=`bridge_models/model-sl.pkl` NUM_EVAL_STEP=10 \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH="bridge_models/model-sl.pkl" NUM_EVAL_STEP=10 \
   LOAD_INITIAL_MODEL=False LOG_PATH="rl_log" EXP_NAME=exp0000 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
 
@@ -78,7 +78,7 @@ For instance, the pre-trained model provided through supervised learning.
 ```bash
 python ppo.py NUM_ENVS=8192 NUM_STEPS=32 MINIBATCHE_SIZE=1024 \
   TOTAL_TIMESTEPS=2621440000 UPDATE_EPOCHS=10 LR=0.000001 GAMMA=1 GAE_LAMBDA=0.95 ENT_COEF=0.001 \
-  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH=`bridge_models/model-sl.pkl` NUM_EVAL_STEP=10 \
-  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH=`bridge_models/model-sl.pkl` \
+  VE_COEF=0.5 NUM_EVAL_ENVS=100 EVAL_OPP_MODEL_PATH="bridge_models/model-sl.pkl" NUM_EVAL_STEP=10 \
+  LOAD_INITIAL_MODEL=True INITIAL_MODEL_PATH="bridge_models/model-sl.pkl" \
   LOG_PATH="rl_log" EXP_NAME=exp0001 SAVE_MODEL=True SAVE_MODEL_INTERVAL=100
 ```
