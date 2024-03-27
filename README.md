@@ -82,3 +82,21 @@ python ppo.py num_envs=8192 num_steps=32 minibatch_size=1024 \
   load_initial_model=True initial_model_path="bridge_models/model-sl.pkl" \
   log_path="rl_log" exp_name=exp0001 save_model=True save_model_interval=100
 ```
+
+## Evaluation with wbridge5
+You can use the  [`bridge_env`](https://github.com/yotaroy/bridge_env) submodule to play a network match against the rule-based bridge AI, [Wbridge5](http://www.wbridge5.com/), on localhost. Please note that Wbridge5 only runs on Windows.
+
+Install the `bridge_env` submodule
+```bash
+git submodule update --init --recursive
+cd submodule/bridge_env
+python setup.py install
+cd ../
+```
+Execute a network match between a trained model and Wbridge5.  
+Example
+```bash
+bash eval_wb5.sh bridge_models/model-sl.pkl relu DeepMind log_wb5 2000 2001
+```
+
+Launch Wbridge5, set "localhost" as the server, connect the positions of "N" and "S" to the first port, and connect the positions of "E" and "W" to the second port.  
