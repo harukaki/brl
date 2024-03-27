@@ -11,6 +11,22 @@ Parameters trained by this repository are published.
 | model-pretrained-rl-with-pfsp.pkl | RL after SL pretraining with mix of SP and PFSP |  0.89 IMPs/b           |
 
 For more details on each training, please refer to `bridge_models/README`.
+## Evaluation models
+To evaluate pre-trained models against each other, please use the following command:  
+Example
+```bash
+python eval.py team1_model_path=bridge_models/model-pretrained-rl.pkl team2_model_path=bridge_models/model-sl.pkl num_eval_envs=100
+```
+
+Here's an example of the output:
+```
+Loading dds results from dds_results/test_000.npy ...
+num envs: 100
+---------------------------------------------------
+bridge_models/model-pretrained-rl.pkl vs. bridge_models/model-pretrained-rl.pkl
+IMP: 0.47999998927116394 ± 0.5320970416069031
+```
+
 ## Usage
 ### 1. Installation
 Please install the necessary packages according to the `requirements.txt`.  
