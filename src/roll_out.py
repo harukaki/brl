@@ -38,9 +38,9 @@ def make_roll_out(config, env, actor_forward_pass, opp_forward_pass):
 
             return no_masked_policy
 
-    if config["game_model"] == "competitive":
+    if config["game_mode"] == "competitive":
         make_step_fn = single_play_step_two_policy_commpetitive
-    elif config["game_model"] == "free-run":
+    elif config["game_mode"] == "free-run":
         make_step_fn = single_play_step_free_run
         opp_forward_pass = None
         opp_params = None

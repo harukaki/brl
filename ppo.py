@@ -102,16 +102,16 @@ class PPOConfig(BaseModel):
     actor_activation: str = "relu"
     actor_model_type: Literal["DeepMind", "FAIR"] = "DeepMind"
     # opposite config
-    game_model: Literal["competitive", "free-run"] = "competitive"
+    game_mode: Literal["competitive", "free-run"] = "competitive"
     self_play: bool = True
     opp_activation: str = "relu"
     opp_model_type: Literal["DeepMind", "FAIR"] = "DeepMind"
     opp_model_path: str = None
     ratio_model_zoo: float = 0
-    num_model_zoo: int = 50_000
+    num_model_zoo: int = 100_000
     threshold_model_zoo: float = -24
     prioritized_fictitious: bool = False
-    prior_t: float = 1
+    prior_t: float = 0.1
     num_prioritized_envs: int = 100
 
     # GAE config
@@ -124,7 +124,7 @@ class PPOConfig(BaseModel):
     # PPO code optimaization
     value_clipping: bool = True
     global_gradient_clipping: bool = True
-    anneal_lr: bool = False  # True
+    anneal_lr: bool = False
     reward_scaling: bool = False
     max_grad_norm: float = 0.5
     reward_scale: float = 7600
@@ -231,7 +231,7 @@ def train(config, rng):
         team2_model_type=config["eval_opp_model_type"],
         team2_model_path=config["eval_opp_model_path"],
         num_eval_envs=config["num_eval_envs"],
-        game_mode=config["game_model"],
+        game_mode=config["game_mode"],
         duplicate=True,
     )
     jit_simple_evaluate = jax.jit(simple_evaluate)
@@ -563,7 +563,7 @@ if __name__ == "__main__":
         "actor_illegal_action_mask": args.actor_illegal_action_mask,
         "actor_illegal_action_penalty": args.actor_illegal_action_penalty,
         "illegal_action_l2norm_coef": args.illegal_action_l2norm_coef,
-        "game_model": args.game_model,
+        "game_mode": args.game_mode,
         "reward_scaling": args.reward_scaling,
         "seed": args.seed,
         "self_play": args.self_play,
