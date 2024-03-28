@@ -105,5 +105,6 @@ Launch Wbridge5, set "localhost" as the server, connect the positions of "N" and
 Analyze the IMPs/b performance against Wbridge5 from the results of the duplicate match.  
 Example
 ```bash
-python -m wb5.analyze_log table1_results_path="log_wb5/board_log/table1_board_0000.json" table2_results_path="log_wb5/board_log/table2_board_0000.json" tag="model"
+python -m wb5.analyze_log table1_results_path="log_wb5/board_log/table1_board_0000.json" \
+  table2_results_path="log_wb5/board_log/table2_board_0000.json" tag="model"
 ```
