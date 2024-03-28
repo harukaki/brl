@@ -19,7 +19,7 @@ Parameters trained by this repository are published.
 | Model                             | Description                                     | Score against wbridge5 |
 |-----------------------------------|-------------------------------------------------|------------------------|
 | model-sl.pkl                      | Supervised Learning from wbridge5               | -0.56 IMPs/b           |
-| model-from-scrach-rl.pkl          | Reinforcement Rearning from scrach              | -0.64 IMPs/b           |
+| model-from-scrach-rl.pkl          | Reinforcement Learning from scrach              | -0.64 IMPs/b           |
 | model-pretrained-rl.pkl           | RL after SL pretraining                         |  0.88 IMPs/b           |
 | model-pretrained-rl-with-fsp.pkl  | RL after SL pretraining with FSP                |  1.24 IMPs/b           |
 | model-pretrained-rl-with-pfsp.pkl | RL after SL pretraining with mix of SP and PFSP |  0.89 IMPs/b           |
