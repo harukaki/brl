@@ -93,10 +93,17 @@ cd submodule/bridge_env
 python setup.py install
 cd ../
 ```
-Execute a network match between a trained model and Wbridge5.  
+Execute a network match (duplicate board) between a trained model and Wbridge5.  
 Example
 ```bash
 bash eval_wb5.sh bridge_models/model-sl.pkl relu DeepMind log_wb5 2000 2001
 ```
+In the example above, you can connect to the first table on port 2000 and the second table on port 2001 on localhost.  
 
 Launch Wbridge5, set "localhost" as the server, connect the positions of "N" and "S" to the first port, and connect the positions of "E" and "W" to the second port.  
+
+Analyze the IMPs/b performance against Wbridge5 from the results of the duplicate match.
+Example
+```bash
+python -m wb5.analyze_log table1_results_path="log_wb5/board_log/table1_board_0000.json" table2_results_path="log_wb5/board_log/table2_board_0000.json" tag="model"
+```
