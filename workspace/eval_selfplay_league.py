@@ -143,3 +143,5 @@ if __name__ == "__main__":
     plt.savefig(
         os.path.join(args.save_fig_directory_path, f"{args.exp_name}_league_clip.png")
     )
+    with open(f"win_lose_{args.exp_name}.npy", "wb") as f:
+        np.save(f, win_lose)
