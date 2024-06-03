@@ -112,3 +112,16 @@ python -m wb5.analyze_log table1_results_path="log_wb5/board_log/table1_board_00
 ## License
 
 Apache 2.0
+
+## Citation
+
+Please cite our paper if you use this repository for you research:
+
+```
+@inproceedings{Kita2024,
+        title        = {{A Simple, Solid, and Reproducible Baseline for Bridge Bidding AI}},
+        author       = {Kita, Haruka and Koyamada, Sotetsu and Yamaguchi, Yotaro and Ishii, Shin},
+        year         = 2024,
+        booktitle    = {IEEE Conference on Games},
+}
+```
