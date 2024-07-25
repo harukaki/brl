@@ -125,6 +125,7 @@ def _duplicate_init(
         _vul_NS=state._vul_NS,
         _vul_EW=state._vul_EW,
         legal_action_mask=legal_actions,
+        _dds_val=state._dds_val
     )
     return duplicated_state
 
