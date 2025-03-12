@@ -19,6 +19,7 @@ class EVALConfig(BaseModel):
         team2_model_type    Model type for team2, either 'DeepMind' or 'FAIR'.
         num_eval_envs       Number of environments for evaluation.
     """
+
     team1_model_path: str = None
     team2_model_path: str = None
     team1_activation: str = "relu"
@@ -40,7 +41,7 @@ if __name__ == "__main__":
         "team2_model_type": args.team2_model_type,
         "num_eval_envs": args.num_eval_envs,
     }
-    eval_env = BridgeBidding("dds_results/test_000.npy")
+    eval_env = BridgeBidding("dds_results/dds_results_10M.npy")
     rng = jax.random.PRNGKey(0)
     duplicate_evaluate = make_simple_duplicate_evaluate(
         eval_env,
@@ -56,7 +57,7 @@ if __name__ == "__main__":
     team1_params = pickle.load(open(config["team1_model_path"], "rb"))
     team2_params = pickle.load(open(config["team2_model_path"], "rb"))
     print("---------------------------------------------------")
-    print(f'{config["team1_model_path"]} vs. {config["team1_model_path"]}')
+    print(f'{config["team1_model_path"]} vs. {config["team2_model_path"]}')
     log, tablea_info, tableb_info = duplicate_evaluate(
         team1_params=team1_params,
         team2_params=team2_params,

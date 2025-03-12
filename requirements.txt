@@ -37,7 +37,7 @@ open-spiel==1.4
 opt-einsum==3.3.0
 optax==0.1.7
 orbax-checkpoint==0.4.8
-pgx==1.4.0
+pgx==2.6.0
 pgx-minatar==0.5.1
 protobuf==4.25.1
 psutil==5.9.7
